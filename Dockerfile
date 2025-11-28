@@ -44,14 +44,11 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies using npm (more reliable in Docker than pnpm)
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # Install Playwright browsers
 RUN npx playwright install chromium
@@ -61,7 +58,7 @@ RUN npx playwright install-deps chromium
 COPY . .
 
 # Build the application
-RUN pnpm run build
+RUN npm run build
 
 # Production stage
 FROM node:20-slim
@@ -107,9 +104,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Install pnpm
-RUN npm install -g pnpm
 
 # Copy everything from builder (simpler and more reliable)
 COPY --from=builder /app ./
