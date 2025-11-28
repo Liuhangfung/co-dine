@@ -589,11 +589,22 @@ ${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction
           ]
         });
 
-        const improvements = improvementResult.choices[0].message.content || "";
+        let improvements = improvementResult.choices[0].message.content || "";
+        
+        // Clean up the response - remove any JSON artifacts or malformed data
+        improvements = typeof improvements === 'string' ? improvements : String(improvements);
+        // Remove JSON objects at the start
+        improvements = improvements.replace(/^\{[^}]*\}[\s,]*/, '');
+        // Find the start of markdown (##) and extract from there
+        const markdownStart = improvements.indexOf('##');
+        if (markdownStart > 0) {
+          improvements = improvements.substring(markdownStart);
+        }
+        improvements = improvements.trim();
 
         // 單獨進行對比分析：計算改良後的營養成分
         let improvedNutrition: any = null;
-        const improvementsText = typeof improvements === 'string' ? improvements : String(improvements);
+        const improvementsText = improvements;
         if (improvementsText && improvementsText.trim().length > 0) {
           try {
             console.log('[createFromWeblink] Starting comparison analysis...');
@@ -784,11 +795,22 @@ ${input.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`)
           ]
         });
 
-        const improvements = improvementResult.choices[0].message.content || "";
+        let improvements = improvementResult.choices[0].message.content || "";
+        
+        // Clean up the response - remove any JSON artifacts or malformed data
+        improvements = typeof improvements === 'string' ? improvements : String(improvements);
+        // Remove JSON objects at the start
+        improvements = improvements.replace(/^\{[^}]*\}[\s,]*/, '');
+        // Find the start of markdown (##) and extract from there
+        const markdownStart = improvements.indexOf('##');
+        if (markdownStart > 0) {
+          improvements = improvements.substring(markdownStart);
+        }
+        improvements = improvements.trim();
 
         // 單獨進行對比分析：計算改良後的營養成分
         let improvedNutrition: any = null;
-        const improvementsText = typeof improvements === 'string' ? improvements : String(improvements);
+        const improvementsText = improvements;
         if (improvementsText && improvementsText.trim().length > 0) {
           try {
             console.log('[createManual] Starting comparison analysis...');
