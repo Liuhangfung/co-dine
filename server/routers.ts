@@ -463,6 +463,8 @@ export const appRouter = router({
           hasNutrition: !!analysis.nutrition
         });
 
+        console.log('[createFromWeblink] ⏳ Starting AI improvement suggestions (this may take 20-30 seconds)...');
+
         // 驗證必需字段 - 如果缺少 title，嘗試從 URL 提取或使用默認值
         if (!analysis.title || typeof analysis.title !== 'string' || analysis.title.trim().length === 0) {
           console.warn('[createFromWeblink] ⚠️ AI未返回標題，使用默認標題');
