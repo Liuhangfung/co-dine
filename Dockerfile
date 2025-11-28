@@ -111,17 +111,8 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
-
-# Copy built assets from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/server ./server
-COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
+# Copy everything from builder (simpler and more reliable)
+COPY --from=builder /app ./
 
 # Set environment to production
 ENV NODE_ENV=production
