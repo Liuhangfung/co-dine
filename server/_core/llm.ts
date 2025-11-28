@@ -216,10 +216,14 @@ const resolveApiUrl = () => {
     if (baseUrl.includes('api.perplexity.ai')) {
       return `${baseUrl}/chat/completions`;
     }
+    // DeepSeek uses /v1/chat/completions
+    if (baseUrl.includes('api.deepseek.com')) {
+      return `${baseUrl}/chat/completions`;
+    }
     // For other APIs, check if they need /v1/ prefix
     return `${baseUrl}/v1/chat/completions`;
   }
-  return "https://api.perplexity.ai/chat/completions";
+  return "https://api.deepseek.com/chat/completions"; // Default to DeepSeek
 };
 
 const checkApiKey = () => {
@@ -294,16 +298,19 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   // Detect which AI service is being used and set appropriate model
-  const isPerplexity = ENV.forgeApiUrl?.includes('api.perplexity.ai') || (!ENV.forgeApiUrl && ENV.forgeApiKey?.startsWith('pplx-'));
-  const isOpenAI = ENV.forgeApiUrl?.includes('api.openai.com') || (!ENV.forgeApiUrl && !isPerplexity && ENV.forgeApiKey?.startsWith('sk-'));
+  const isDeepSeek = ENV.forgeApiUrl?.includes('api.deepseek.com') || (!ENV.forgeApiUrl && ENV.forgeApiKey?.startsWith('sk-') && !ENV.forgeApiUrl);
+  const isPerplexity = ENV.forgeApiUrl?.includes('api.perplexity.ai') || ENV.forgeApiKey?.startsWith('pplx-');
+  const isOpenAI = ENV.forgeApiUrl?.includes('api.openai.com');
   
   let model: string;
-  if (isPerplexity) {
+  if (isDeepSeek) {
+    model = "deepseek-chat"; // DeepSeek's main model
+  } else if (isPerplexity) {
     model = "sonar-pro"; // Perplexity's most capable model
   } else if (isOpenAI) {
     model = "gpt-4o";
   } else {
-    model = "gemini-2.5-flash"; // Default fallback
+    model = "deepseek-chat"; // Default to DeepSeek
   }
   
   const payload: Record<string, unknown> = {
@@ -323,10 +330,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
+  // Set max_tokens based on API provider limits
+  if (isDeepSeek) {
+    payload.max_tokens = 8192; // DeepSeek limit
+  } else {
+    payload.max_tokens = 32768; // OpenAI/others
+  }
   
-  // Only add thinking parameter for non-OpenAI/Perplexity APIs
-  if (!isOpenAI && !isPerplexity) {
+  // Only add thinking parameter for non-OpenAI/Perplexity/DeepSeek APIs
+  if (!isOpenAI && !isPerplexity && !isDeepSeek) {
     payload.thinking = {
       "budget_tokens": 128
     }
@@ -339,7 +351,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     output_schema,
   });
 
-  if (normalizedResponseFormat) {
+  // DeepSeek doesn't support response_format parameter yet
+  if (normalizedResponseFormat && !isDeepSeek) {
     payload.response_format = normalizedResponseFormat;
   }
 

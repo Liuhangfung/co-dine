@@ -511,16 +511,62 @@ export const appRouter = router({
         }
         analysis.servings = Math.round(analysis.servings);
 
-        // 生成改良建議（恢復原始提示詞）
+        // 生成改良建議（確保生成健康版本）
         const improvementResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: "你是一位米芝蓮級大廚。根據食譜提供專業的改良建議,使其更健康、更美味。"
+              content: `你是一位米芝蓮級大廚和營養師。你的任務是將傳統食譜改造成更健康的版本。
+
+**必須應用以下健康原則改造食譜：**
+
+1. 🍯 **糖分替代（強制執行）**
+   - 所有白砂糖必須改為蜜糖（用量減少20%）
+   - 或用天然水果（如蘋果、橙、檸檬）提供甜味
+   - 避免任何精製糖
+
+2. 🍄 **減鹽增鮮（強制執行）**
+   - 鹽的用量減少40-50%
+   - 加入自製香菇粉（鹽量的50%）提供鮮味
+   - 例：10g鹽 → 5g鹽 + 5g香菇粉
+
+3. 🍎 **增加生果（強制執行）**
+   - 每道菜至少加入一種新鮮水果
+   - 水果可以提供甜味、酸味或清新口感
+   - 例：蘋果、橙、檸檬、奇異果等
+
+4. 🌿 **天然調味（強制執行）**
+   - 甜酸醬改用：檸檬汁 + 蜜糖 + 果汁
+   - 避免人工調味料
+   - 用天然香料和新鮮食材
+
+5. 🟤 **避免精製產品**
+   - 白米改糙米或五穀米
+   - 白麵粉改全麥麵粉
+   - 精製油改橄欖油或椰子油
+
+**輸出要求：**
+- 提供完整的健康版食譜
+- 列出所有改動的食材和份量
+- 說明健康益處
+- 確保保留原有風味`
             },
             {
               role: "user",
-              content: `食譜: ${analysis.title}\n食材: ${JSON.stringify(analysis.ingredients)}\n步驟: ${JSON.stringify(analysis.steps)}\n\n請提供改良建議。`
+              content: `原始食譜：
+              
+標題: ${analysis.title}
+
+食材清單:
+${analysis.ingredients.map((ing: any) => `- ${ing.name} ${ing.amount || ''} ${ing.unit || ''}`).join('\n')}
+
+烹飪步驟:
+${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`).join('\n')}
+
+**請將此食譜改造成健康版本，必須應用所有5項健康原則，並提供：**
+1. 改良後的完整食材清單（標明哪些改動了）
+2. 改良後的烹飪步驟
+3. 每項改動的健康益處說明`
             }
           ]
         });
@@ -642,16 +688,62 @@ export const appRouter = router({
         // 計算營養成分
         const totalCalories = input.ingredients.reduce((sum, ing) => sum + (ing as any).calories || 0, 0);
 
-        // 生成改良建議（恢復原始提示詞）
+        // 生成改良建議（確保生成健康版本）
         const improvementResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: "你是一位米芝蓮級大廚。根據食譜提供專業的改良建議,使其更健康、更美味。"
+              content: `你是一位米芝蓮級大廚和營養師。你的任務是將傳統食譜改造成更健康的版本。
+
+**必須應用以下健康原則改造食譜：**
+
+1. 🍯 **糖分替代（強制執行）**
+   - 所有白砂糖必須改為蜜糖（用量減少20%）
+   - 或用天然水果（如蘋果、橙、檸檬）提供甜味
+   - 避免任何精製糖
+
+2. 🍄 **減鹽增鮮（強制執行）**
+   - 鹽的用量減少40-50%
+   - 加入自製香菇粉（鹽量的50%）提供鮮味
+   - 例：10g鹽 → 5g鹽 + 5g香菇粉
+
+3. 🍎 **增加生果（強制執行）**
+   - 每道菜至少加入一種新鮮水果
+   - 水果可以提供甜味、酸味或清新口感
+   - 例：蘋果、橙、檸檬、奇異果等
+
+4. 🌿 **天然調味（強制執行）**
+   - 甜酸醬改用：檸檬汁 + 蜜糖 + 果汁
+   - 避免人工調味料
+   - 用天然香料和新鮮食材
+
+5. 🟤 **避免精製產品**
+   - 白米改糙米或五穀米
+   - 白麵粉改全麥麵粉
+   - 精製油改橄欖油或椰子油
+
+**輸出要求：**
+- 提供完整的健康版食譜
+- 列出所有改動的食材和份量
+- 說明健康益處
+- 確保保留原有風味`
             },
             {
               role: "user",
-              content: `食譜: ${input.title}\n食材: ${JSON.stringify(input.ingredients)}\n步驟: ${JSON.stringify(input.steps)}\n\n請提供改良建議。`
+              content: `原始食譜：
+              
+標題: ${input.title}
+
+食材清單:
+${input.ingredients.map((ing: any) => `- ${ing.name} ${ing.amount || ''} ${ing.unit || ''}`).join('\n')}
+
+烹飪步驟:
+${input.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`).join('\n')}
+
+**請將此食譜改造成健康版本，必須應用所有5項健康原則，並提供：**
+1. 改良後的完整食材清單（標明哪些改動了）
+2. 改良後的烹飪步驟
+3. 每項改動的健康益處說明`
             }
           ]
         });
@@ -1029,7 +1121,7 @@ export const appRouter = router({
         const steps = await db.getCookingStepsByRecipeId(recipe.id);
 
         // 構建提示詞
-        let prompt = `你是一位米芝蓮級大廚。以下是一個食譜的資訊：\n\n`;
+        let prompt = `以下是一個食譜的資訊：\n\n`;
         prompt += `食譜名稱: ${recipe.title}\n`;
         prompt += `描述: ${recipe.description || "無"}\n`;
         prompt += `份量: ${recipe.servings}\n`;
@@ -1051,6 +1143,19 @@ export const appRouter = router({
 
         prompt += `\n用戶的改良建議:\n${suggestion.suggestionText}\n\n`;
         
+        prompt += `\n**必須應用以下健康原則改造食譜：**
+
+1. 🍯 **糖分替代（強制執行）** - 所有糖改為蜜糖或水果，用量減20%
+2. 🍄 **減鹽增鮮（強制執行）** - 鹽減少40-50%，加入香菇粉提鮮
+3. 🍎 **增加生果（強制執行）** - 加入至少一種新鮮水果
+4. 🌿 **天然調味（強制執行）** - 用檸檬汁+蜜糖+果汁代替人工醬料
+5. 🟤 **避免精製產品** - 用糙米、全麥、橄欖油等天然食材
+
+**請提供完整的健康改良版本，包括：**
+- 改良後的完整食材清單（標明改動）
+- 改良後的烹飪步驟
+- 每項改動的健康益處\n\n`;
+        
         if (suggestion.targetCalories) {
           prompt += `目標卡路里: ${suggestion.targetCalories} kcal\n`;
         }
@@ -1064,14 +1169,28 @@ export const appRouter = router({
           prompt += `目標脂肪: ${suggestion.targetFat} g\n`;
         }
 
-        prompt += `\n請根據用戶的建議,提供詳細的改良方案。你必須返回 JSON 格式的回應。`;
+        prompt += `\n請根據用戶的建議,提供詳細的改良方案。
+
+**你必須以以下 JSON 格式返回（嚴格遵守格式）：**
+{
+  "ingredientAdjustments": "詳細說明食材如何調整和替換",
+  "methodAdjustments": "詳細說明烹飪方法如何修改",
+  "improvedNutrition": {
+    "calories": 整數,
+    "protein": 整數,
+    "carbs": 整數,
+    "fat": 整數,
+    "fiber": 整數
+  },
+  "healthTips": "健康提示和建議"
+}`;
 
         // 調用AI生成改良方案（使用結構化輸出）
         const aiResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: "你是一位米芝蓮級大廿和營養師,擅長根據用戶的需求改良食譜,使其更健康、更美味。你必須返回 JSON 格式的回應。"
+              content: "你是一位米芝蓮級大廚和營養師。你必須將食譜改造成健康版本。強制應用：🍯蜜糖代糖（減20%）、🍄香菇粉減鹽（減40-50%）、🍎加入水果、🌿天然調味。提供完整的健康改良版食譜，不只是建議。回應必須是有效的 JSON 格式，不要加入任何其他文字。"
             },
             {
               role: "user",
