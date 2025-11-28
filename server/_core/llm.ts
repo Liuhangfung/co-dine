@@ -315,9 +315,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } else if (isOpenAI) {
     model = "gpt-4o"; // Fast and capable
   } else if (isXAI) {
-    model = "grok-beta"; // xAI's Grok model (fast and capable)
+    model = "grok-2-1212"; // xAI's latest Grok model (fast and capable)
   } else {
-    model = "grok-beta"; // Default to xAI Grok (fast and reliable)
+    model = "grok-2-1212"; // Default to xAI Grok (fast and reliable)
   }
   
   const payload: Record<string, unknown> = {
