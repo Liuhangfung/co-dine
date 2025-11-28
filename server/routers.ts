@@ -601,33 +601,33 @@ ${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction
               messages: [
                 {
                   role: "system",
-                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須返回 JSON 格式。"
+                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須只返回純 JSON 格式，不要任何其他文字。"
                 },
                 {
                   role: "user",
-                  content: `原始食譜營養成分:\n- 總卡路里: ${analysis.nutrition.totalCalories} kcal\n- 蛋白質: ${analysis.nutrition.protein} g\n- 碳水化合物: ${analysis.nutrition.carbs} g\n- 脂肪: ${analysis.nutrition.fat} g\n- 纖維: ${analysis.nutrition.fiber} g\n\n改良建議:\n${improvementsText.substring(0, 2000)}\n\n請根據改良建議，計算改良後食譜的預估營養成分。`
+                  content: `原始食譜營養成分:
+- 總卡路里: ${analysis.nutrition.totalCalories} kcal
+- 蛋白質: ${analysis.nutrition.protein} g
+- 碳水化合物: ${analysis.nutrition.carbs} g
+- 脂肪: ${analysis.nutrition.fat} g
+- 纖維: ${analysis.nutrition.fiber} g
+
+改良建議:
+${improvementsText.substring(0, 2000)}
+
+請根據改良建議，計算改良後食譜的預估營養成分。
+
+**只返回以下 JSON 格式（不要加其他文字）：**
+{
+  "calories": 整數,
+  "protein": 整數,
+  "carbs": 整數,
+  "fat": 整數,
+  "fiber": 整數
+}`
                 }
-              ],
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "nutrition_comparison",
-                  strict: true,
-                  schema: {
-                    type: "object",
-                    properties: {
-                      calories: { type: "integer", description: "改良後總卡路里 (kcal)" },
-                      protein: { type: "integer", description: "改良後蛋白質 (g)" },
-                      carbs: { type: "integer", description: "改良後碳水化合物 (g)" },
-                      fat: { type: "integer", description: "改良後脂肪 (g)" },
-                      fiber: { type: "integer", description: "改良後纖維 (g)" }
-                  },
-                  required: ["calories", "protein", "carbs", "fat", "fiber"],
-                  additionalProperties: false
-                }
-              }
-            }
-          });
+              ]
+            });
           
             const parsedNutrition = JSON.parse(comparisonResult.choices[0].message.content as string);
             improvedNutrition = parsedNutrition;
@@ -796,33 +796,29 @@ ${input.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`)
               messages: [
                 {
                   role: "system",
-                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須返回 JSON 格式。"
+                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須只返回純 JSON 格式，不要任何其他文字。"
                 },
                 {
                   role: "user",
-                  content: `原始食譜營養成分:\n- 總卡路里: ${totalCalories} kcal\n\n改良建議:\n${improvementsText.substring(0, 2000)}\n\n請根據改良建議，計算改良後食譜的預估營養成分。`
+                  content: `原始食譜營養成分:
+- 總卡路里: ${totalCalories} kcal
+
+改良建議:
+${improvementsText.substring(0, 2000)}
+
+請根據改良建議，計算改良後食譜的預估營養成分。
+
+**只返回以下 JSON 格式（不要加其他文字）：**
+{
+  "calories": 整數,
+  "protein": 整數,
+  "carbs": 整數,
+  "fat": 整數,
+  "fiber": 整數
+}`
                 }
-              ],
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "nutrition_comparison",
-                  strict: true,
-                  schema: {
-                    type: "object",
-                    properties: {
-                      calories: { type: "integer", description: "改良後總卡路里 (kcal)" },
-                      protein: { type: "integer", description: "改良後蛋白質 (g)" },
-                      carbs: { type: "integer", description: "改良後碳水化合物 (g)" },
-                      fat: { type: "integer", description: "改良後脂肪 (g)" },
-                      fiber: { type: "integer", description: "改良後纖維 (g)" }
-                  },
-                  required: ["calories", "protein", "carbs", "fat", "fiber"],
-                  additionalProperties: false
-                }
-              }
-            }
-          });
+              ]
+            });
           
             const parsedNutrition = JSON.parse(comparisonResult.choices[0].message.content as string);
             improvedNutrition = parsedNutrition;
