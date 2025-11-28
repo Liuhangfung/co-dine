@@ -680,42 +680,44 @@ export default function RecipeDetail() {
                    typeof improvedNutrition.carbs === 'number' &&
                    typeof improvedNutrition.fat === 'number' &&
                    typeof improvedNutrition.fiber === 'number' ? (
-                    // 有完整的改良後營養數據，顯示對比
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {/* 原始食譜 */}
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="font-semibold text-gray-700 mb-3">原始食譜</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">總卡路里:</span>
-                            <span className="font-medium">{originalNutrition.totalCalories} kcal</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">蛋白質:</span>
-                            <span className="font-medium">{originalNutrition.protein} g</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">碳水化合物:</span>
-                            <span className="font-medium">{originalNutrition.carbs} g</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">脂肪:</span>
-                            <span className="font-medium">{originalNutrition.fat} g</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">纖維:</span>
-                            <span className="font-medium">{originalNutrition.fiber} g</span>
+                    // 有完整的改良後營養數據，顯示詳細對比
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {/* 原始食譜 */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-700 mb-3">原始食譜</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">總卡路里:</span>
+                              <span className="font-medium">{originalNutrition.totalCalories} kcal</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">蛋白質:</span>
+                              <span className="font-medium">{originalNutrition.protein} g</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">碳水化合物:</span>
+                              <span className="font-medium">{originalNutrition.carbs} g</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">脂肪:</span>
+                              <span className="font-medium">{originalNutrition.fat} g</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">纖維:</span>
+                              <span className="font-medium">{originalNutrition.fiber} g</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      {/* 改良後 */}
-                      <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
-                        <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                          <span>✨</span>
-                          米芝蓮級 AI 改良建議
-                        </h4>
-                        <div className="space-y-2 text-sm">
+                        
+                        {/* 改良後 */}
+                        <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                          <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                            <span>✨</span>
+                            米芝蓮級 AI 改良建議
+                          </h4>
+                          <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-700">總卡路里:</span>
                             <span className={`font-medium ${
@@ -808,7 +810,236 @@ export default function RecipeDetail() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Detailed Comparison with Visual Bars */}
+                      <div className="bg-white border rounded-lg p-6">
+                        <h4 className="font-semibold text-gray-800 mb-4">📊 詳細營養對比分析</h4>
+                        <div className="space-y-4">
+                          {/* Calories */}
+                          {(() => {
+                            const diff = improvedNutrition.calories - originalNutrition.totalCalories;
+                            const percent = originalNutrition.totalCalories ? Math.round((diff / originalNutrition.totalCalories) * 100) : 0;
+                            const isGood = diff < 0;
+                            return (
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-medium">總卡路里</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">{originalNutrition.totalCalories} → {improvedNutrition.calories} kcal</span>
+                                    <span className={`text-sm font-semibold ${isGood ? 'text-green-600' : 'text-orange-600'}`}>
+                                      {isGood ? '↓' : '↑'} {Math.abs(percent)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-orange-500'}`}
+                                    style={{width: `${Math.min(100, Math.abs(percent))}%`}}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {isGood ? '✓ 減少熱量攝入有助於體重控制' : '注意：卡路里增加'}
+                                </p>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Protein */}
+                          {(() => {
+                            const diff = improvedNutrition.protein - originalNutrition.protein;
+                            const percent = originalNutrition.protein ? Math.round((diff / originalNutrition.protein) * 100) : 0;
+                            const isGood = diff > 0;
+                            return (
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-medium">蛋白質</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">{originalNutrition.protein} → {improvedNutrition.protein} g</span>
+                                    <span className={`text-sm font-semibold ${isGood ? 'text-green-600' : diff < 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                                      {diff > 0 ? '↑' : diff < 0 ? '↓' : '='} {Math.abs(percent)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-blue-500'}`}
+                                    style={{width: `${Math.min(100, Math.abs(percent))}%`}}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {isGood ? '✓ 增加蛋白質有助肌肉生長和飽足感' : diff < 0 ? '注意：蛋白質減少' : '蛋白質維持不變'}
+                                </p>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Carbs */}
+                          {(() => {
+                            const diff = improvedNutrition.carbs - originalNutrition.carbs;
+                            const percent = originalNutrition.carbs ? Math.round((diff / originalNutrition.carbs) * 100) : 0;
+                            const isGood = diff < 0;
+                            return (
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-medium">碳水化合物</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">{originalNutrition.carbs} → {improvedNutrition.carbs} g</span>
+                                    <span className={`text-sm font-semibold ${isGood ? 'text-green-600' : diff > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                                      {diff > 0 ? '↑' : diff < 0 ? '↓' : '='} {Math.abs(percent)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-yellow-500'}`}
+                                    style={{width: `${Math.min(100, Math.abs(percent))}%`}}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {isGood ? '✓ 減少碳水化合物有助血糖控制' : diff > 0 ? '注意：碳水化合物增加' : '碳水化合物維持不變'}
+                                </p>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Fat */}
+                          {(() => {
+                            const diff = improvedNutrition.fat - originalNutrition.fat;
+                            const percent = originalNutrition.fat ? Math.round((diff / originalNutrition.fat) * 100) : 0;
+                            const isGood = diff < 0;
+                            return (
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-medium">脂肪</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">{originalNutrition.fat} → {improvedNutrition.fat} g</span>
+                                    <span className={`text-sm font-semibold ${isGood ? 'text-green-600' : diff > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                                      {diff > 0 ? '↑' : diff < 0 ? '↓' : '='} {Math.abs(percent)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-red-500'}`}
+                                    style={{width: `${Math.min(100, Math.abs(percent))}%`}}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {isGood ? '✓ 減少脂肪有助心血管健康' : diff > 0 ? '注意：脂肪增加' : '脂肪維持不變'}
+                                </p>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Fiber */}
+                          {(() => {
+                            const diff = improvedNutrition.fiber - originalNutrition.fiber;
+                            const percent = originalNutrition.fiber ? Math.round((diff / originalNutrition.fiber) * 100) : 0;
+                            const isGood = diff > 0;
+                            return (
+                              <div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm font-medium">纖維</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600">{originalNutrition.fiber} → {improvedNutrition.fiber} g</span>
+                                    <span className={`text-sm font-semibold ${isGood ? 'text-green-600' : diff < 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                                      {diff > 0 ? '↑' : diff < 0 ? '↓' : '='} {Math.abs(percent)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-gray-400'}`}
+                                    style={{width: `${Math.min(100, Math.abs(percent))}%`}}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {isGood ? '✓ 增加纖維有助消化和飽足感' : diff < 0 ? '注意：纖維減少' : '纖維維持不變'}
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Per Serving Breakdown */}
+                      {recipe.servings && recipe.servings > 1 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-blue-900 mb-3">👤 每人份營養</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">卡路里</p>
+                              <p className="font-bold text-blue-700">{Math.round(improvedNutrition.calories / recipe.servings)}</p>
+                              <p className="text-xs text-gray-500">kcal/份</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">蛋白質</p>
+                              <p className="font-bold text-blue-700">{Math.round(improvedNutrition.protein / recipe.servings)}</p>
+                              <p className="text-xs text-gray-500">g/份</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">碳水</p>
+                              <p className="font-bold text-blue-700">{Math.round(improvedNutrition.carbs / recipe.servings)}</p>
+                              <p className="text-xs text-gray-500">g/份</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">脂肪</p>
+                              <p className="font-bold text-blue-700">{Math.round(improvedNutrition.fat / recipe.servings)}</p>
+                              <p className="text-xs text-gray-500">g/份</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-gray-600 mb-1">纖維</p>
+                              <p className="font-bold text-blue-700">{Math.round(improvedNutrition.fiber / recipe.servings)}</p>
+                              <p className="text-xs text-gray-500">g/份</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-3 text-center">
+                            總份量：{recipe.servings} 人份
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Health Benefits Summary */}
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-green-900 mb-3">💚 健康改善總結</h4>
+                        <div className="grid md:grid-cols-2 gap-3 text-sm">
+                          {improvedNutrition.calories < originalNutrition.totalCalories && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-green-600 mt-0.5">✓</span>
+                              <p className="text-gray-700">
+                                減少 <strong>{Math.abs(improvedNutrition.calories - originalNutrition.totalCalories)}</strong> 卡路里，
+                                相當於 <strong>{Math.round(Math.abs(improvedNutrition.calories - originalNutrition.totalCalories) / 7700 * 10) / 10}</strong> kg 體重
+                              </p>
+                            </div>
+                          )}
+                          {improvedNutrition.fat < originalNutrition.fat && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-green-600 mt-0.5">✓</span>
+                              <p className="text-gray-700">
+                                減少 <strong>{Math.abs(improvedNutrition.fat - originalNutrition.fat)}</strong> g 脂肪，降低心血管疾病風險
+                              </p>
+                            </div>
+                          )}
+                          {improvedNutrition.fiber > originalNutrition.fiber && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-green-600 mt-0.5">✓</span>
+                              <p className="text-gray-700">
+                                增加 <strong>{improvedNutrition.fiber - originalNutrition.fiber}</strong> g 纖維，促進腸道健康
+                              </p>
+                            </div>
+                          )}
+                          {improvedNutrition.carbs < originalNutrition.carbs && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-green-600 mt-0.5">✓</span>
+                              <p className="text-gray-700">
+                                減少 <strong>{Math.abs(improvedNutrition.carbs - originalNutrition.carbs)}</strong> g 碳水，有助血糖穩定
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                  </div>
                   ) : (
                     // 沒有改良後營養數據，只顯示原始數據和提示
                     <div className="text-center py-8">
