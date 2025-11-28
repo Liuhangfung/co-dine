@@ -640,7 +640,22 @@ ${improvementsText.substring(0, 2000)}
               ]
             });
           
-            const parsedNutrition = JSON.parse(comparisonResult.choices[0].message.content as string);
+            // Clean the JSON response aggressively
+            let jsonResponse = comparisonResult.choices[0].message.content as string;
+            // Remove any text before the first {
+            const firstBrace = jsonResponse.indexOf('{');
+            if (firstBrace > 0) {
+              jsonResponse = jsonResponse.substring(firstBrace);
+            }
+            // Remove any text after the last }
+            const lastBrace = jsonResponse.lastIndexOf('}');
+            if (lastBrace > 0) {
+              jsonResponse = jsonResponse.substring(0, lastBrace + 1);
+            }
+            // Remove any extra quotes or commas
+            jsonResponse = jsonResponse.trim();
+            
+            const parsedNutrition = JSON.parse(jsonResponse);
             improvedNutrition = parsedNutrition;
             console.log('[createFromWeblink] Comparison analysis successful:', improvedNutrition);
             
@@ -842,7 +857,22 @@ ${improvementsText.substring(0, 2000)}
               ]
             });
           
-            const parsedNutrition = JSON.parse(comparisonResult.choices[0].message.content as string);
+            // Clean the JSON response aggressively
+            let jsonResponse = comparisonResult.choices[0].message.content as string;
+            // Remove any text before the first {
+            const firstBrace = jsonResponse.indexOf('{');
+            if (firstBrace > 0) {
+              jsonResponse = jsonResponse.substring(firstBrace);
+            }
+            // Remove any text after the last }
+            const lastBrace = jsonResponse.lastIndexOf('}');
+            if (lastBrace > 0) {
+              jsonResponse = jsonResponse.substring(0, lastBrace + 1);
+            }
+            // Remove any extra quotes or commas
+            jsonResponse = jsonResponse.trim();
+            
+            const parsedNutrition = JSON.parse(jsonResponse);
             improvedNutrition = parsedNutrition;
             console.log('[createManual] Comparison analysis successful:', improvedNutrition);
           } catch (error) {
