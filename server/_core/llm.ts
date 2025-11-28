@@ -308,9 +308,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } else if (isPerplexity) {
     model = "sonar-pro"; // Perplexity's most capable model
   } else if (isOpenAI) {
-    model = "gpt-4o";
+    model = "gpt-4o"; // Fast and capable
   } else {
-    model = "deepseek-chat"; // Default to DeepSeek
+    model = "gpt-4o"; // Default to OpenAI GPT-4o (fast and reliable)
   }
   
   const payload: Record<string, unknown> = {
@@ -333,8 +333,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Set max_tokens based on API provider limits
   if (isDeepSeek) {
     payload.max_tokens = 8192; // DeepSeek limit
+  } else if (isOpenAI) {
+    payload.max_tokens = 4096; // OpenAI GPT-4o default (good balance of speed and length)
   } else {
-    payload.max_tokens = 32768; // OpenAI/others
+    payload.max_tokens = 16384; // Others
   }
   
   // Only add thinking parameter for non-OpenAI/Perplexity/DeepSeek APIs

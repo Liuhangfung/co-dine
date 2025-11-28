@@ -465,27 +465,35 @@ export const appRouter = router({
 
         console.log('[createFromWeblink] ⏳ Starting AI improvement suggestions (this may take 20-30 seconds)...');
 
+        console.log('[createFromWeblink] 🔍 Step 1: Validating title...');
         // 驗證必需字段 - 如果缺少 title，嘗試從 URL 提取或使用默認值
         if (!analysis.title || typeof analysis.title !== 'string' || analysis.title.trim().length === 0) {
           console.warn('[createFromWeblink] ⚠️ AI未返回標題，使用默認標題');
-          // 從 URL 提取標題或使用默認值
           const urlMatch = input.url.match(/youtu\.be\/([^?]+)|youtube\.com\/watch\?v=([^&]+)/);
           const videoId = urlMatch ? (urlMatch[1] || urlMatch[2]) : 'unknown';
           analysis.title = `食譜 - ${videoId}`;
         }
+        console.log('[createFromWeblink] ✅ Title validated');
         
+        console.log('[createFromWeblink] 🔍 Step 2: Validating description...');
         if (!analysis.description || typeof analysis.description !== 'string') {
-          analysis.description = analysis.title; // 如果沒有描述，使用標題作為描述
+          analysis.description = analysis.title;
         }
+        console.log('[createFromWeblink] ✅ Description validated');
         
+        console.log('[createFromWeblink] 🔍 Step 3: Validating ingredients...');
         if (!analysis.ingredients || !Array.isArray(analysis.ingredients) || analysis.ingredients.length === 0) {
           throw new Error('AI分析結果缺少食材清單。請確保網頁內容包含食材資訊，或重試。');
         }
+        console.log('[createFromWeblink] ✅ Ingredients validated');
         
+        console.log('[createFromWeblink] 🔍 Step 4: Validating steps...');
         if (!analysis.steps || !Array.isArray(analysis.steps) || analysis.steps.length === 0) {
           throw new Error('AI分析結果缺少烹飪步驟。請確保網頁內容包含烹飪步驟，或重試。');
         }
+        console.log('[createFromWeblink] ✅ Steps validated');
         
+        console.log('[createFromWeblink] 🔍 Step 5: Validating nutrition...');
         if (!analysis.nutrition || typeof analysis.nutrition !== 'object') {
           throw new Error('AI分析結果缺少營養分析。請重試。');
         }
@@ -497,7 +505,9 @@ export const appRouter = router({
             throw new Error(`AI分析結果缺少營養成分字段：${field}。請重試。`);
           }
         }
+        console.log('[createFromWeblink] ✅ Nutrition validated');
         
+        console.log('[createFromWeblink] 🔍 Step 6: Normalizing nutrition values...');
         // 確保營養成分是整數
         analysis.nutrition.totalCalories = Math.round(analysis.nutrition.totalCalories || 0);
         analysis.nutrition.protein = Math.round(analysis.nutrition.protein || 0);
@@ -510,20 +520,14 @@ export const appRouter = router({
           analysis.servings = 1;
         }
         analysis.servings = Math.round(analysis.servings);
+        console.log('[createFromWeblink] ✅ All validation completed!');
 
         // 生成改良建議（詳細版本）
         const improvementResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: `你是一位擁有30年經驗的米芝蓮三星大廚和註冊營養師。你精通中西料理，擅長將傳統食譜改造成既健康又美味的現代版本。
-
-你的專長包括：
-- 營養學和健康飲食原則
-- 食材替代和優化
-- 烹飪技巧創新
-- 風味平衡與提升
-- 食材搭配科學
+              content: `你是擁有30年經驗的米芝蓮三星大廚和註冊營養師。你精通中西料理，擅長將傳統食譜改造成既健康又美味的現代版本。
 
 請提供詳細、專業、實用的改良建議，幫助家庭廚師提升烹飪水平。`
             },
@@ -541,85 +545,36 @@ ${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction
 
 ---
 
-請以米芝蓮級大廚的專業角度，提供**全面且詳細**的改良建議，包括：
+請提供專業改良建議，包括以下內容：
 
-## 📝 請按以下結構回覆：
+## 🍎 健康升級方案
+1. **食材替代建議**（3-4項，說明健康益處和具體用量）
+   - 例：白砂糖50g → 蜜糖40g（減少20%精製糖）
+2. **營養強化技巧**（添加超級食材、增加蔬菜）
+3. **健康烹飪方法**${analysis.title.includes('炸') ? '\n   - **🔥 必須：改用氣炸鍋（200°C 15分鐘），減少80%油脂，提供噴油技巧**' : ''}
 
-### 🍎 健康升級方案
-1. **食材替代建議**：
-   - 列出3-5項具體的食材替代方案
-   - 說明每項替代的健康益處（如減糖、減鹽、增加纖維等）
-   - 提供替代食材的用量建議
-   - 例：白砂糖50g → 蜜糖40g（減少20%精製糖，天然果糖更健康）
+## 👨‍🍳 烹飪技巧提升
+1. **專業秘訣**（3-4個米芝蓮級技巧）
+2. **常見錯誤與解決方案**
+3. **擺盤與呈現建議**
 
-2. **營養強化技巧**：
-   - 如何在不改變風味的前提下增加營養價值
-   - 可以添加哪些超級食材（如奇亞籽、亞麻籽、堅果等）
-   - 如何增加蔬菜攝入量
+## 🌟 風味升級建議
+1. **香料與調味**（推薦天然調味料和使用時機）
+2. **質感與口感改善**
+3. **創意變化**（2-3種變化版本）
 
-3. **健康烹飪方法**：
-   - 改良烹飪技巧以減少油脂和鹽分
-   - **🔥 重要：如果食譜涉及油炸（炸），必須建議改用氣炸鍋（氣炸）**
-     * 說明氣炸的溫度和時間設置（如：200°C氣炸15分鐘）
-     * 解釋如何達到酥脆效果但減少80%以上的油脂
-     * 提供噴油技巧（用噴霧器噴少量橄欖油）
-     * 氣炸的具體操作步驟和注意事項
-   - 推薦的烹飪溫度和時間調整
-   - 如何保留更多營養素
+## 💡 實用貼士
+1. **食材採購和季節性**
+2. **提前準備和時間管理**
+3. **儲存與再加熱方法**
+4. **搭配建議**（配菜和飲品）
 
-### 👨‍🍳 烹飪技巧提升
-1. **專業技巧**：
-   - 分享3-5個米芝蓮級的烹飪秘訣
-   - 如何提升口感和風味層次
-   - 食材處理的專業手法
+## 📊 營養優化總結
+- 主要健康益處
+- 營養改善幅度（減少XX%鈉、增加XX%纖維）
+- 適合人群
 
-2. **常見錯誤與解決**：
-   - 指出這道菜可能出現的問題
-   - 提供避免失敗的關鍵提示
-
-3. **擺盤與呈現**：
-   - 專業的擺盤建議
-   - 如何讓這道菜更有視覺吸引力
-
-### 🌟 風味升級建議
-1. **香料與調味**：
-   - 推薦額外的香料或調味料
-   - 如何用天然食材取代人工調味料
-   - 香料的使用時機和份量
-
-2. **質感與口感**：
-   - 如何改善食材的質感
-   - 創造多層次的口感體驗
-
-3. **創意變化**：
-   - 提供2-3種創意變化版本
-   - 適合不同場合的調整建議
-
-### 💡 實用貼士
-1. **食材採購**：
-   - 如何挑選最優質的食材
-   - 什麼季節最適合製作這道菜
-
-2. **提前準備**：
-   - 哪些步驟可以提前完成
-   - 如何節省烹飪時間
-
-3. **儲存與再加熱**：
-   - 最佳儲存方法
-   - 如何保持最佳風味
-
-4. **搭配建議**：
-   - 推薦的配菜或主食
-   - 適合的飲品搭配
-
-### 📊 營養優化總結
-- 列出改良後的主要健康益處
-- 預估營養成分的改善幅度（如減少XX%的鈉、增加XX%的纖維）
-- 適合的人群（如健身人士、糖尿病患者、兒童等）
-
----
-
-**請提供詳細、具體、可操作的建議。用專業但易懂的語言，讓家庭廚師能輕鬆實踐。每個部分提供2-3個要點即可，總長度約800-1000字。**`
+每個部分提供具體可操作的建議，總長度約600-800字。`
             }
           ]
         });
@@ -765,14 +720,7 @@ ${improvementsText.substring(0, 1500)}
           messages: [
             {
               role: "system",
-              content: `你是一位擁有30年經驗的米芝蓮三星大廚和註冊營養師。你精通中西料理，擅長將傳統食譜改造成既健康又美味的現代版本。
-
-你的專長包括：
-- 營養學和健康飲食原則
-- 食材替代和優化
-- 烹飪技巧創新
-- 風味平衡與提升
-- 食材搭配科學
+              content: `你是擁有30年經驗的米芝蓮三星大廚和註冊營養師。你精通中西料理，擅長將傳統食譜改造成既健康又美味的現代版本。
 
 請提供詳細、專業、實用的改良建議，幫助家庭廚師提升烹飪水平。`
             },
