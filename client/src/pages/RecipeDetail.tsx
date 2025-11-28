@@ -174,6 +174,16 @@ export default function RecipeDetail() {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(recipe.sourceUrl || '');
+                            toast.success('連結已複製到剪貼板');
+                          }}
+                        >
+                          複製
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => recipe.sourceUrl && window.open(recipe.sourceUrl, "_blank")}
                         >
                           打開
@@ -572,7 +582,7 @@ export default function RecipeDetail() {
 
         {/* AI Improvement Suggestions */}
         {recipe.improvementSuggestions && (() => {
-          // 嘗試解析 JSON 格式的改良建議
+          // 直接使用 improvementSuggestions（已包含完整文本）
           let improvementText = "";
           let healthBenefits = "";
           let isJsonFormat = false;

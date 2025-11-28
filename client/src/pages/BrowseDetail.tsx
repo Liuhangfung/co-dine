@@ -120,6 +120,16 @@ export default function BrowseDetail() {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(recipe.sourceUrl || '');
+                            toast.success('連結已複製到剪貼板');
+                          }}
+                        >
+                          複製
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => recipe.sourceUrl && window.open(recipe.sourceUrl, "_blank")}
                         >
                           打開

@@ -409,75 +409,73 @@ export const appRouter = router({
    示例格式：
    {"totalCalories": 910, "protein": 30, "carbs": 120, "fat": 35, "fiber": 5}
 
-**請從以上網頁內容提取完整的食譜資訊。如果內容不完整，請根據可見的資訊和你的專業知識補充完整。**`
+**請從以上網頁內容提取完整的食譜資訊。如果內容不完整，請根據可見的資訊和你的專業知識補充完整。**
+
+**只返回JSON格式（不要markdown代碼塊）：**
+{
+  "title": "食譜名稱",
+  "description": "簡短描述",
+  "servings": 份量數字,
+  "ingredients": [{"name": "食材名", "amount": "數量", "unit": "單位", "calories": 卡路里數字}],
+  "steps": [{"instruction": "步驟說明", "duration": 分鐘數字或null, "temperature": "溫度或null"}],
+  "nutrition": {"totalCalories": 數字, "protein": 數字, "carbs": 數字, "fat": 數字, "fiber": 數字}
+}`
             }
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "recipe_analysis",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  servings: { type: "integer" },
-                  ingredients: {
-                    type: "array",
-                    minItems: 1,
-                    description: "食材清單，必須至少包含1個食材",
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "食材名稱" },
-                        amount: { type: "string", description: "數量" },
-                        unit: { type: "string", description: "單位" },
-                        calories: { type: "integer", description: "卡路里" }
-                      },
-                      required: ["name", "amount", "unit", "calories"],
-                      additionalProperties: false
-                    }
-                  },
-                  steps: {
-                    type: "array",
-                    minItems: 1,
-                    description: "烹飪步驟，必須至少包含1個步驟",
-                    items: {
-                      type: "object",
-                      properties: {
-                        instruction: { type: "string", description: "烹飪說明" },
-                        duration: { type: "integer", description: "時間（分鐘）" },
-                        temperature: { type: "string", description: "溫度" }
-                      },
-                      required: ["instruction"],
-                      additionalProperties: false
-                    }
-                  },
-                  nutrition: {
-                    type: "object",
-                    description: "營養分析，必須包含所有營養成分",
-                    properties: {
-                      totalCalories: { type: "integer", description: "總卡路里" },
-                      protein: { type: "integer", description: "蛋白質（克）" },
-                      carbs: { type: "integer", description: "碳水化合物（克）" },
-                      fat: { type: "integer", description: "脂肪（克）" },
-                      fiber: { type: "integer", description: "纖維（克）" }
-                    },
-                    required: ["totalCalories", "protein", "carbs", "fat", "fiber"],
-                    additionalProperties: false
-                  }
-                },
-                required: ["title", "description", "servings", "ingredients", "steps", "nutrition"],
-                additionalProperties: false
-              }
-            }
-          }
+          ]
+          // DeepSeek 不支援 response_format，使用簡單的 prompt 指導格式
         });
 
-        const analysis = JSON.parse(analysisResult.choices[0].message.content as string);
+        // Clean the JSON response - DeepSeek wraps JSON in markdown code blocks
+        let analysisJson = analysisResult.choices[0].message.content as string;
+        console.log('[createFromWeblink] 🔍 Raw analysis response (first 500 chars):', analysisJson.substring(0, 500));
+        
+        // 超強清理 JSON
+        // 1. 移除所有 markdown 代碼塊標記
+        analysisJson = analysisJson.replace(/```json/gi, '').replace(/```/g, '');
+        
+        // 2. 移除任何開頭的文字說明（在 { 之前）
+        const firstBrace = analysisJson.indexOf('{');
+        const lastBrace = analysisJson.lastIndexOf('}');
+        
+        if (firstBrace === -1 || lastBrace === -1) {
+          console.error('[createFromWeblink] ❌ Raw content:', analysisJson);
+          throw new Error('AI返回的分析結果格式錯誤，找不到有效的JSON結構。請重試。');
+        }
+        
+        // 3. 只提取 { ... } 之間的內容
+        analysisJson = analysisJson.substring(firstBrace, lastBrace + 1);
+        
+        console.log('[createFromWeblink] ✅ Cleaned analysis JSON (first 500 chars):', analysisJson.substring(0, 500));
+        
+        let analysis;
+        try {
+          analysis = JSON.parse(analysisJson);
+        } catch (parseError) {
+          console.error('[createFromWeblink] ❌ JSON parse error:', parseError);
+          console.error('[createFromWeblink] ❌ Failed JSON:', analysisJson.substring(0, 1000));
+          throw new Error('AI返回的JSON格式無效，請重試。');
+        }
+        console.log('[createFromWeblink] 📋 Parsed analysis:', {
+          title: analysis.title,
+          description: analysis.description ? analysis.description.substring(0, 50) + '...' : 'NO DESCRIPTION',
+          ingredientsCount: analysis.ingredients?.length || 0,
+          stepsCount: analysis.steps?.length || 0,
+          hasNutrition: !!analysis.nutrition
+        });
 
-        // 驗證必需字段
+        // 驗證必需字段 - 如果缺少 title，嘗試從 URL 提取或使用默認值
+        if (!analysis.title || typeof analysis.title !== 'string' || analysis.title.trim().length === 0) {
+          console.warn('[createFromWeblink] ⚠️ AI未返回標題，使用默認標題');
+          // 從 URL 提取標題或使用默認值
+          const urlMatch = input.url.match(/youtu\.be\/([^?]+)|youtube\.com\/watch\?v=([^&]+)/);
+          const videoId = urlMatch ? (urlMatch[1] || urlMatch[2]) : 'unknown';
+          analysis.title = `食譜 - ${videoId}`;
+        }
+        
+        if (!analysis.description || typeof analysis.description !== 'string') {
+          analysis.description = analysis.title; // 如果沒有描述，使用標題作為描述
+        }
+        
         if (!analysis.ingredients || !Array.isArray(analysis.ingredients) || analysis.ingredients.length === 0) {
           throw new Error('AI分析結果缺少食材清單。請確保網頁內容包含食材資訊，或重試。');
         }
@@ -511,105 +509,25 @@ export const appRouter = router({
         }
         analysis.servings = Math.round(analysis.servings);
 
-        // 生成改良建議（確保生成健康版本）
+        // 生成改良建議（恢復原始提示詞）
         const improvementResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: `你是一位米芝蓮級大廚和營養師。你的任務是將傳統食譜改造成更健康的版本。
-
-**必須應用以下健康原則改造食譜：**
-
-1. 🍯 **糖分替代（強制執行）**
-   - 所有白砂糖必須改為蜜糖（用量減少20%）
-   - 或用天然水果（如蘋果、橙、檸檬）提供甜味
-   - 避免任何精製糖
-
-2. 🍄 **減鹽增鮮（強制執行）**
-   - 鹽的用量減少40-50%
-   - 加入自製香菇粉（鹽量的50%）提供鮮味
-   - 例：10g鹽 → 5g鹽 + 5g香菇粉
-
-3. 🍎 **增加生果（強制執行）**
-   - 每道菜至少加入一種新鮮水果
-   - 水果可以提供甜味、酸味或清新口感
-   - 例：蘋果、橙、檸檬、奇異果等
-
-4. 🌿 **天然調味（強制執行）**
-   - 甜酸醬改用：檸檬汁 + 蜜糖 + 果汁
-   - 避免人工調味料
-   - 用天然香料和新鮮食材
-
-5. 🟤 **避免精製產品**
-   - 白米改糙米或五穀米
-   - 白麵粉改全麥麵粉
-   - 精製油改橄欖油或椰子油
-
-**輸出要求：**
-- 提供完整的健康版食譜
-- 列出所有改動的食材和份量
-- 說明健康益處
-- 確保保留原有風味`
+              content: "你是一位米芝蓮級大廚。根據食譜提供專業的改良建議,使其更健康、更美味。"
             },
             {
               role: "user",
-              content: `原始食譜：
-              
-標題: ${analysis.title}
-
-食材清單:
-${analysis.ingredients.map((ing: any) => `- ${ing.name} ${ing.amount || ''} ${ing.unit || ''}`).join('\n')}
-
-烹飪步驟:
-${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`).join('\n')}
-
-===========================
-請將此食譜改造成健康版本，必須應用所有5項健康原則。
-
-**必須嚴格按照以下格式輸出，不要有任何偏差：**
-
-## 🍎 健康改良版本
-
-### 📋 改良後食材清單：
-- ✅ 牛肉 500g（保持不變）
-- ❌ 白砂糖 50g → ✅ 蜜糖 40g（減少20%精製糖，用天然蜜糖代替）
-- ❌ 鹽 10g → ✅ 鹽 5g + 自製香菇粉 5g（減鹽50%，用香菇粉提鮮）
-- ✅ 新增：蘋果 1個（約150g，增加天然甜味和纖維）
-
-### 🍳 改良後烹飪步驟：
-1. 第一步驟的詳細說明
-2. 第二步驟的詳細說明
-3. 第三步驟的詳細說明
-
-### 💚 健康益處說明：
-✓ 精製糖減少20%（50g→40g），改用天然蜜糖
-✓ 鈉攝入減少50%（10g→5g），用香菇粉提供鮮味
-✓ 增加膳食纖維（來自蘋果），促進腸道健康
-
-**格式要求：**
-1. 必須有三個標題：📋 改良後食材清單、🍳 改良後烹飪步驟、💚 健康益處說明
-2. 食材必須標明 ❌ 和 ✅
-3. 必須包含具體份量數字`
+              content: `食譜: ${analysis.title}\n食材: ${JSON.stringify(analysis.ingredients)}\n步驟: ${JSON.stringify(analysis.steps)}\n\n請提供改良建議。`
             }
           ]
         });
 
-        let improvements = improvementResult.choices[0].message.content || "";
-        
-        // Clean up the response - remove any JSON artifacts or malformed data
-        improvements = typeof improvements === 'string' ? improvements : String(improvements);
-        // Remove JSON objects at the start
-        improvements = improvements.replace(/^\{[^}]*\}[\s,]*/, '');
-        // Find the start of markdown (##) and extract from there
-        const markdownStart = improvements.indexOf('##');
-        if (markdownStart > 0) {
-          improvements = improvements.substring(markdownStart);
-        }
-        improvements = improvements.trim();
+        const improvements = improvementResult.choices[0].message.content || "";
 
-        // 單獨進行對比分析：計算改良後的營養成分
+        // 單獨進行對比分析：計算改良後的營養成分 (SEPARATE CALL FOR JSON)
         let improvedNutrition: any = null;
-        const improvementsText = improvements;
+        const improvementsText = typeof improvements === 'string' ? improvements : String(improvements);
         if (improvementsText && improvementsText.trim().length > 0) {
           try {
             console.log('[createFromWeblink] Starting comparison analysis...');
@@ -617,52 +535,46 @@ ${analysis.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction
               messages: [
                 {
                   role: "system",
-                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須只返回純 JSON 格式，不要任何其他文字。"
+                  content: "你是營養分析AI。只返回純JSON，不要任何markdown或額外文字。"
                 },
                 {
                   role: "user",
-                  content: `原始食譜營養成分:
-- 總卡路里: ${analysis.nutrition.totalCalories} kcal
-- 蛋白質: ${analysis.nutrition.protein} g
-- 碳水化合物: ${analysis.nutrition.carbs} g
-- 脂肪: ${analysis.nutrition.fat} g
-- 纖維: ${analysis.nutrition.fiber} g
+                  content: `原始營養: 卡路里${analysis.nutrition.totalCalories}kcal, 蛋白質${analysis.nutrition.protein}g, 碳水${analysis.nutrition.carbs}g, 脂肪${analysis.nutrition.fat}g, 纖維${analysis.nutrition.fiber}g
 
 改良建議:
-${improvementsText.substring(0, 2000)}
+${improvementsText.substring(0, 1500)}
 
-請根據改良建議，計算改良後食譜的預估營養成分。
-
-**只返回以下 JSON 格式（不要加其他文字）：**
-{
-  "calories": 整數,
-  "protein": 整數,
-  "carbs": 整數,
-  "fat": 整數,
-  "fiber": 整數
-}`
+計算改良後營養成分，只返回JSON格式:
+{"calories": 整數, "protein": 整數, "carbs": 整數, "fat": 整數, "fiber": 整數}`
                 }
               ]
-            });
+              // 不使用 response_format，DeepSeek 不支援
+          });
           
-            // Clean the JSON response aggressively
+            // 超強清理 - DeepSeek 經常返回 ```json...``` 包裹的內容
             let jsonResponse = comparisonResult.choices[0].message.content as string;
-            // Remove any text before the first {
+            console.log('[createFromWeblink] 🔍 Raw response:', jsonResponse);
+            
+            // 移除所有 markdown 代碼塊
+            jsonResponse = jsonResponse.replace(/```json/gi, '').replace(/```/g, '');
+            
+            // 移除所有換行和多餘空格
+            jsonResponse = jsonResponse.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+            
+            // 只提取 { 到 } 之間的內容
             const firstBrace = jsonResponse.indexOf('{');
-            if (firstBrace > 0) {
-              jsonResponse = jsonResponse.substring(firstBrace);
-            }
-            // Remove any text after the last }
             const lastBrace = jsonResponse.lastIndexOf('}');
-            if (lastBrace > 0) {
-              jsonResponse = jsonResponse.substring(0, lastBrace + 1);
+            
+            if (firstBrace === -1 || lastBrace === -1) {
+              throw new Error('No valid JSON object found in response');
             }
-            // Remove any extra quotes or commas
-            jsonResponse = jsonResponse.trim();
+            
+            jsonResponse = jsonResponse.substring(firstBrace, lastBrace + 1).trim();
+            console.log('[createFromWeblink] ✅ Cleaned JSON:', jsonResponse);
             
             const parsedNutrition = JSON.parse(jsonResponse);
             improvedNutrition = parsedNutrition;
-            console.log('[createFromWeblink] Comparison analysis successful:', improvedNutrition);
+            console.log('[createFromWeblink] ✅ Parsed nutrition:', improvedNutrition);
             
             // 將改良後的營養成分存儲到aiAnalysis中（在創建食譜時使用）
           } catch (error) {
@@ -674,14 +586,22 @@ ${improvementsText.substring(0, 2000)}
           console.log('[createFromWeblink] No improvements text, skipping comparison analysis');
         }
 
-        // 準備aiAnalysis數據（包含改良後的營養成分）
+        // 準備aiAnalysis數據（包含改良後的營養成分和完整改良建議）
         const aiAnalysisData = {
           ...analysis,
-          ...(improvedNutrition && { improvedNutrition: improvedNutrition })
+          ...(improvedNutrition && { improvedNutrition: improvedNutrition }),
+          // 將完整的改良建議存儲在 aiAnalysis 中，避免 text 欄位長度限制
+          improvementSuggestionsFullText: improvementsText
         };
         console.log('[createFromWeblink] Final aiAnalysisData:', JSON.stringify(aiAnalysisData, null, 2));
 
-        // 創建食譜記錄
+        console.log('[createFromWeblink] 🔍 About to create recipe with:');
+        console.log('  - title:', analysis.title);
+        console.log('  - description:', analysis.description);
+        console.log('  - servings:', analysis.servings);
+        console.log('  - totalCalories:', analysis.nutrition.totalCalories);
+        console.log('  - improvementSuggestions length:', improvementsText.length);
+
         const recipeId = await db.createRecipe({
           userId: 1, // Default user ID since auth is disabled
           title: analysis.title,
@@ -696,7 +616,7 @@ ${improvementsText.substring(0, 2000)}
           fat: analysis.nutrition.fat,
           fiber: analysis.nutrition.fiber,
           aiAnalysis: JSON.stringify(aiAnalysisData),
-          improvementSuggestions: improvementsText,
+          improvementSuggestions: improvementsText, // Save FULL text - PostgreSQL text type has NO limit
           isPublished: false,
         });
         
@@ -727,6 +647,8 @@ ${improvementsText.substring(0, 2000)}
           });
         }
 
+        console.log('[createFromWeblink] ✅ Recipe created successfully! ID:', recipeId);
+        console.log('[createFromWeblink] 🎯 Returning to frontend...');
         return { recipeId, analysis, improvements };
       }),
 
@@ -737,105 +659,25 @@ ${improvementsText.substring(0, 2000)}
         // 計算營養成分
         const totalCalories = input.ingredients.reduce((sum, ing) => sum + (ing as any).calories || 0, 0);
 
-        // 生成改良建議（確保生成健康版本）
+        // 生成改良建議（恢復原始提示詞）
         const improvementResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: `你是一位米芝蓮級大廚和營養師。你的任務是將傳統食譜改造成更健康的版本。
-
-**必須應用以下健康原則改造食譜：**
-
-1. 🍯 **糖分替代（強制執行）**
-   - 所有白砂糖必須改為蜜糖（用量減少20%）
-   - 或用天然水果（如蘋果、橙、檸檬）提供甜味
-   - 避免任何精製糖
-
-2. 🍄 **減鹽增鮮（強制執行）**
-   - 鹽的用量減少40-50%
-   - 加入自製香菇粉（鹽量的50%）提供鮮味
-   - 例：10g鹽 → 5g鹽 + 5g香菇粉
-
-3. 🍎 **增加生果（強制執行）**
-   - 每道菜至少加入一種新鮮水果
-   - 水果可以提供甜味、酸味或清新口感
-   - 例：蘋果、橙、檸檬、奇異果等
-
-4. 🌿 **天然調味（強制執行）**
-   - 甜酸醬改用：檸檬汁 + 蜜糖 + 果汁
-   - 避免人工調味料
-   - 用天然香料和新鮮食材
-
-5. 🟤 **避免精製產品**
-   - 白米改糙米或五穀米
-   - 白麵粉改全麥麵粉
-   - 精製油改橄欖油或椰子油
-
-**輸出要求：**
-- 提供完整的健康版食譜
-- 列出所有改動的食材和份量
-- 說明健康益處
-- 確保保留原有風味`
+              content: "你是一位米芝蓮級大廚。根據食譜提供專業的改良建議,使其更健康、更美味。"
             },
             {
               role: "user",
-              content: `原始食譜：
-              
-標題: ${input.title}
-
-食材清單:
-${input.ingredients.map((ing: any) => `- ${ing.name} ${ing.amount || ''} ${ing.unit || ''}`).join('\n')}
-
-烹飪步驟:
-${input.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`).join('\n')}
-
-===========================
-請將此食譜改造成健康版本，必須應用所有5項健康原則。
-
-**必須嚴格按照以下格式輸出，不要有任何偏差：**
-
-## 🍎 健康改良版本
-
-### 📋 改良後食材清單：
-- ✅ 牛肉 500g（保持不變）
-- ❌ 白砂糖 50g → ✅ 蜜糖 40g（減少20%精製糖，用天然蜜糖代替）
-- ❌ 鹽 10g → ✅ 鹽 5g + 自製香菇粉 5g（減鹽50%，用香菇粉提鮮）
-- ✅ 新增：蘋果 1個（約150g，增加天然甜味和纖維）
-
-### 🍳 改良後烹飪步驟：
-1. 第一步驟的詳細說明
-2. 第二步驟的詳細說明
-3. 第三步驟的詳細說明
-
-### 💚 健康益處說明：
-✓ 精製糖減少20%（50g→40g），改用天然蜜糖
-✓ 鈉攝入減少50%（10g→5g），用香菇粉提供鮮味
-✓ 增加膳食纖維（來自蘋果），促進腸道健康
-
-**格式要求：**
-1. 必須有三個標題：📋 改良後食材清單、🍳 改良後烹飪步驟、💚 健康益處說明
-2. 食材必須標明 ❌ 和 ✅
-3. 必須包含具體份量數字`
+              content: `食譜: ${input.title}\n食材: ${JSON.stringify(input.ingredients)}\n步驟: ${JSON.stringify(input.steps)}\n\n請提供改良建議。`
             }
           ]
         });
 
-        let improvements = improvementResult.choices[0].message.content || "";
-        
-        // Clean up the response - remove any JSON artifacts or malformed data
-        improvements = typeof improvements === 'string' ? improvements : String(improvements);
-        // Remove JSON objects at the start
-        improvements = improvements.replace(/^\{[^}]*\}[\s,]*/, '');
-        // Find the start of markdown (##) and extract from there
-        const markdownStart = improvements.indexOf('##');
-        if (markdownStart > 0) {
-          improvements = improvements.substring(markdownStart);
-        }
-        improvements = improvements.trim();
+        const improvements = improvementResult.choices[0].message.content || "";
 
-        // 單獨進行對比分析：計算改良後的營養成分
+        // 單獨進行對比分析：計算改良後的營養成分 (SEPARATE CALL FOR JSON)
         let improvedNutrition: any = null;
-        const improvementsText = improvements;
+        const improvementsText = typeof improvements === 'string' ? improvements : String(improvements);
         if (improvementsText && improvementsText.trim().length > 0) {
           try {
             console.log('[createManual] Starting comparison analysis...');
@@ -843,48 +685,46 @@ ${input.steps.map((step: any, idx: number) => `${idx + 1}. ${step.instruction}`)
               messages: [
                 {
                   role: "system",
-                  content: "你是一位營養師。根據改良建議計算改良後食譜的營養成分。你必須只返回純 JSON 格式，不要任何其他文字。"
+                  content: "你是營養分析AI。只返回純JSON，不要任何markdown或額外文字。"
                 },
                 {
                   role: "user",
-                  content: `原始食譜營養成分:
-- 總卡路里: ${totalCalories} kcal
+                  content: `原始營養: 卡路里${totalCalories}kcal
 
 改良建議:
-${improvementsText.substring(0, 2000)}
+${improvementsText.substring(0, 1500)}
 
-請根據改良建議，計算改良後食譜的預估營養成分。
-
-**只返回以下 JSON 格式（不要加其他文字）：**
-{
-  "calories": 整數,
-  "protein": 整數,
-  "carbs": 整數,
-  "fat": 整數,
-  "fiber": 整數
-}`
+計算改良後營養成分，只返回JSON格式:
+{"calories": 整數, "protein": 整數, "carbs": 整數, "fat": 整數, "fiber": 整數}`
                 }
               ]
-            });
+              // 不使用 response_format，DeepSeek 不支援
+          });
           
-            // Clean the JSON response aggressively
+            // 超強清理 - DeepSeek 經常返回 ```json...``` 包裹的內容
             let jsonResponse = comparisonResult.choices[0].message.content as string;
-            // Remove any text before the first {
+            console.log('[createManual] 🔍 Raw response:', jsonResponse);
+            
+            // 移除所有 markdown 代碼塊
+            jsonResponse = jsonResponse.replace(/```json/gi, '').replace(/```/g, '');
+            
+            // 移除所有換行和多餘空格
+            jsonResponse = jsonResponse.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+            
+            // 只提取 { 到 } 之間的內容
             const firstBrace = jsonResponse.indexOf('{');
-            if (firstBrace > 0) {
-              jsonResponse = jsonResponse.substring(firstBrace);
-            }
-            // Remove any text after the last }
             const lastBrace = jsonResponse.lastIndexOf('}');
-            if (lastBrace > 0) {
-              jsonResponse = jsonResponse.substring(0, lastBrace + 1);
+            
+            if (firstBrace === -1 || lastBrace === -1) {
+              throw new Error('No valid JSON object found in response');
             }
-            // Remove any extra quotes or commas
-            jsonResponse = jsonResponse.trim();
+            
+            jsonResponse = jsonResponse.substring(firstBrace, lastBrace + 1).trim();
+            console.log('[createManual] ✅ Cleaned JSON:', jsonResponse);
             
             const parsedNutrition = JSON.parse(jsonResponse);
             improvedNutrition = parsedNutrition;
-            console.log('[createManual] Comparison analysis successful:', improvedNutrition);
+            console.log('[createManual] ✅ Parsed nutrition:', improvedNutrition);
           } catch (error) {
             console.error('[createManual] Failed to calculate improved nutrition:', error);
             console.error('[createManual] Error details:', error instanceof Error ? error.message : String(error));
@@ -894,7 +734,7 @@ ${improvementsText.substring(0, 2000)}
           console.log('[createManual] No improvements text, skipping comparison analysis');
         }
 
-        // 準備aiAnalysis數據（包含改良後的營養成分）
+        // 準備aiAnalysis數據（包含改良後的營養成分和完整改良建議）
         const aiAnalysisData = {
           title: input.title,
           description: input.description,
@@ -908,10 +748,11 @@ ${improvementsText.substring(0, 2000)}
             fat: 0,
             fiber: 0
           },
-          ...(improvedNutrition && { improvedNutrition: improvedNutrition })
+          ...(improvedNutrition && { improvedNutrition: improvedNutrition }),
+          // 將完整的改良建議存儲在 aiAnalysis 中，避免 text 欄位長度限制
+          improvementSuggestionsFullText: improvementsText
         };
 
-        // 創建食譜記錄
         const recipeId = await db.createRecipe({
           userId: 1, // Default user ID since auth is disabled
           title: input.title,
@@ -921,7 +762,7 @@ ${improvementsText.substring(0, 2000)}
           totalCalories,
           caloriesPerServing: input.servings > 0 ? Math.round(totalCalories / input.servings) : 0,
           aiAnalysis: JSON.stringify(aiAnalysisData),
-          improvementSuggestions: improvements as string,
+          improvementSuggestions: improvementsText, // Save FULL text - PostgreSQL text type has NO limit
           isPublished: false,
         });
 
@@ -1096,7 +937,19 @@ ${improvementsText.substring(0, 2000)}
           }
         });
 
-        const nutrition = JSON.parse(analysisResult.choices[0].message.content as string);
+        // Clean the JSON response - DeepSeek wraps JSON in markdown code blocks
+        let nutritionJson = analysisResult.choices[0].message.content as string;
+        nutritionJson = nutritionJson.replace(/```json/gi, '').replace(/```/g, '');
+        nutritionJson = nutritionJson.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+        
+        const firstBrace = nutritionJson.indexOf('{');
+        const lastBrace = nutritionJson.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          nutritionJson = nutritionJson.substring(firstBrace, lastBrace + 1).trim();
+        }
+        
+        const nutrition = JSON.parse(nutritionJson);
 
         // 更新食譜的營養成分
         await db.updateRecipe(input.recipeId, {
@@ -1215,7 +1068,7 @@ ${improvementsText.substring(0, 2000)}
         const steps = await db.getCookingStepsByRecipeId(recipe.id);
 
         // 構建提示詞
-        let prompt = `以下是一個食譜的資訊：\n\n`;
+        let prompt = `你是一位米芝蓮級大廚。以下是一個食譜的資訊：\n\n`;
         prompt += `食譜名稱: ${recipe.title}\n`;
         prompt += `描述: ${recipe.description || "無"}\n`;
         prompt += `份量: ${recipe.servings}\n`;
@@ -1237,19 +1090,6 @@ ${improvementsText.substring(0, 2000)}
 
         prompt += `\n用戶的改良建議:\n${suggestion.suggestionText}\n\n`;
         
-        prompt += `\n**必須應用以下健康原則改造食譜：**
-
-1. 🍯 **糖分替代（強制執行）** - 所有糖改為蜜糖或水果，用量減20%
-2. 🍄 **減鹽增鮮（強制執行）** - 鹽減少40-50%，加入香菇粉提鮮
-3. 🍎 **增加生果（強制執行）** - 加入至少一種新鮮水果
-4. 🌿 **天然調味（強制執行）** - 用檸檬汁+蜜糖+果汁代替人工醬料
-5. 🟤 **避免精製產品** - 用糙米、全麥、橄欖油等天然食材
-
-**請提供完整的健康改良版本，包括：**
-- 改良後的完整食材清單（標明改動）
-- 改良後的烹飪步驟
-- 每項改動的健康益處\n\n`;
-        
         if (suggestion.targetCalories) {
           prompt += `目標卡路里: ${suggestion.targetCalories} kcal\n`;
         }
@@ -1265,10 +1105,10 @@ ${improvementsText.substring(0, 2000)}
 
         prompt += `\n請根據用戶的建議,提供詳細的改良方案。
 
-**你必須以以下 JSON 格式返回（嚴格遵守格式）：**
+返回以下JSON格式:
 {
-  "ingredientAdjustments": "詳細說明食材如何調整和替換",
-  "methodAdjustments": "詳細說明烹飪方法如何修改",
+  "ingredientAdjustments": "如何調整食材",
+  "methodAdjustments": "如何修改烹飪方法",
   "improvedNutrition": {
     "calories": 整數,
     "protein": 整數,
@@ -1276,63 +1116,23 @@ ${improvementsText.substring(0, 2000)}
     "fat": 整數,
     "fiber": 整數
   },
-  "healthTips": "健康提示和建議"
+  "healthTips": "健康益處說明",
+  "additionalAdvice": "其他建議"
 }`;
 
-        // 調用AI生成改良方案（使用結構化輸出）
+        // 調用AI生成改良方案（簡化版，不使用 response_format）
         const aiResult = await safeInvokeLLM({
           messages: [
             {
               role: "system",
-              content: "你是一位米芝蓮級大廚和營養師。你必須將食譜改造成健康版本。強制應用：🍯蜜糖代糖（減20%）、🍄香菇粉減鹽（減40-50%）、🍎加入水果、🌿天然調味。提供完整的健康改良版食譜，不只是建議。回應必須是有效的 JSON 格式，不要加入任何其他文字。"
+              content: "你是營養分析AI。只返回純JSON，不要任何markdown或額外文字。"
             },
             {
               role: "user",
               content: prompt
             }
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "recipe_improvement",
-              strict: true,
-              schema: {
-                type: "object",
-                properties: {
-                  ingredientAdjustments: {
-                    type: "string",
-                    description: "如何調整食材份量或替換食材的詳細說明"
-                  },
-                  methodAdjustments: {
-                    type: "string",
-                    description: "如何修改烹飪方法的詳細說明"
-                  },
-                  improvedNutrition: {
-                    type: "object",
-                    properties: {
-                      calories: { type: "integer", description: "優化後總卡路里 (kcal)" },
-                      protein: { type: "integer", description: "優化後蛋白質 (g)" },
-                      carbs: { type: "integer", description: "優化後碳水化合物 (g)" },
-                      fat: { type: "integer", description: "優化後脂肪 (g)" },
-                      fiber: { type: "integer", description: "優化後纖維 (g)" }
-                    },
-                    required: ["calories", "protein", "carbs", "fat", "fiber"],
-                    additionalProperties: false
-                  },
-                  healthTips: {
-                    type: "string",
-                    description: "健康提示，說明改良後的健康益處和風味特點"
-                  },
-                  additionalAdvice: {
-                    type: "string",
-                    description: "其他專業建議"
-                  }
-                },
-                required: ["ingredientAdjustments", "methodAdjustments", "improvedNutrition", "healthTips", "additionalAdvice"],
-                additionalProperties: false
-              }
-            }
-          }
+          ]
+          // 不使用 response_format，DeepSeek 不支援
         });
 
         const aiContent = aiResult.choices[0]?.message?.content;
@@ -1340,7 +1140,28 @@ ${improvementsText.substring(0, 2000)}
         let aiResponse: string;
         
         try {
-          parsedResponse = typeof aiContent === 'string' ? JSON.parse(aiContent) : null;
+          // 超強清理 - DeepSeek 經常返回 ```json...``` 包裹的內容
+          let jsonResponse = typeof aiContent === 'string' ? aiContent : String(aiContent);
+          console.log('[process] 🔍 Raw response:', jsonResponse.substring(0, 300));
+          
+          // 移除所有 markdown 代碼塊
+          jsonResponse = jsonResponse.replace(/```json/gi, '').replace(/```/g, '');
+          
+          // 移除所有換行和多餘空格
+          jsonResponse = jsonResponse.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+          
+          // 只提取 { 到 } 之間的內容
+          const firstBrace = jsonResponse.indexOf('{');
+          const lastBrace = jsonResponse.lastIndexOf('}');
+          
+          if (firstBrace === -1 || lastBrace === -1) {
+            throw new Error('No valid JSON object found in response');
+          }
+          
+          jsonResponse = jsonResponse.substring(firstBrace, lastBrace + 1).trim();
+          console.log('[process] ✅ Cleaned JSON:', jsonResponse.substring(0, 300));
+          
+          parsedResponse = JSON.parse(jsonResponse);
           if (!parsedResponse) {
             throw new Error('無法解析 AI 回應');
           }

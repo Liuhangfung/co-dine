@@ -18,8 +18,8 @@ services:
       # Vite/App configuration
       - VITE_APP_ID=${VITE_APP_ID}
       
-      # Built-in Forge API (if using)
-      - BUILT_IN_FORGE_API_URL=${BUILT_IN_FORGE_API_URL}
+      # AI API Configuration (DeepSeek by default)
+      - BUILT_IN_FORGE_API_URL=${BUILT_IN_FORGE_API_URL:-https://api.deepseek.com}
       - BUILT_IN_FORGE_API_KEY=${BUILT_IN_FORGE_API_KEY}
       
       # Node environment
