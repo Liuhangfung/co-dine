@@ -32,9 +32,10 @@ export async function getDb() {
       // Create postgres client with connection options
       // Supabase connection pooler requires SSL
       _client = postgres(process.env.DATABASE_URL, {
-        max: 1, // Limit connections for Supabase free tier
-        idle_timeout: 20,
-        connect_timeout: 10,
+        max: 10, // Allow multiple concurrent connections (Supabase supports this well)
+        idle_timeout: 60, // Keep connections alive longer (60 seconds)
+        connect_timeout: 30, // More time to establish connection
+        max_lifetime: 60 * 30, // 30 minutes max connection lifetime
         ssl: { rejectUnauthorized: false }, // Supabase uses self-signed certificates
       });
       // Test connection
