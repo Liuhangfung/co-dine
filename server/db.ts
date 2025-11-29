@@ -30,16 +30,20 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       // Create postgres client with connection options
-      // Persistent connection that stays alive
+      // Optimized for Supabase PAID plan (higher connection limits)
       _client = postgres(process.env.DATABASE_URL, {
-        max: 10, // Allow multiple concurrent connections
+        max: 20, // Higher limit for paid plan (you have 200-400+ available)
         idle_timeout: 0, // Never timeout idle connections (keep alive forever)
         connect_timeout: 30, // Initial connection timeout
-        max_lifetime: 0, // Never expire connections (persistent)
+        max_lifetime: 60 * 60 * 24, // Recycle connections every 24 hours (paid plan is stable)
         ssl: { rejectUnauthorized: false }, // Supabase uses self-signed certificates
         connection: {
           application_name: 'co-dine-app', // Identify your app in Supabase
         },
+        // Keep connection alive with periodic pings (prevents firewall timeouts)
+        keep_alive: true,
+        // Auto-reconnect on connection loss
+        onnotice: () => {}, // Suppress notice logs
       });
       // Test connection
       await _client`SELECT 1`;
