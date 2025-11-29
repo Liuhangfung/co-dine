@@ -6,10 +6,13 @@ import { Link, useParams } from "wouter";
 import { ArrowLeft, Utensils, Flame, Beef, Cookie, Droplet, Users, Clock, ThumbsUp, ThumbsDown, Star, CheckCircle2, GitCompare } from "lucide-react";
 import { APP_TITLE } from "@/const";
 import { Streamdown } from "streamdown";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export default function BrowseDetail() {
   const params = useParams<{ id: string }>();
   const recipeId = parseInt(params.id || "0");
+  const [copied, setCopied] = useState(false);
 
   const { data: recipe, isLoading } = trpc.recipes.getPublicById.useQuery({ id: recipeId });
 
@@ -126,6 +129,8 @@ export default function BrowseDetail() {
                             if (navigator.clipboard && window.isSecureContext) {
                               navigator.clipboard.writeText(url);
                               toast.success('連結已複製到剪貼板');
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
                             } else {
                               // Fallback method for HTTP
                               const textArea = document.createElement('textarea');
@@ -138,6 +143,8 @@ export default function BrowseDetail() {
                               try {
                                 document.execCommand('copy');
                                 toast.success('連結已複製到剪貼板');
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
                               } catch (err) {
                                 toast.error('複製失敗，請手動複製');
                               }
@@ -145,7 +152,7 @@ export default function BrowseDetail() {
                             }
                           }}
                         >
-                          複製
+                          {copied ? '✓ 已複製' : '複製'}
                         </Button>
                         <Button 
                           variant="outline" 

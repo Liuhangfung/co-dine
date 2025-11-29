@@ -22,6 +22,7 @@ export default function RecipeDetail() {
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [substitutionDialogOpen, setSubstitutionDialogOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<{ id: number; name: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: recipe, isLoading, refetch } = trpc.recipes.getById.useQuery({ id: recipeId });
   const { data: suggestions } = trpc.suggestions.getByRecipe.useQuery({ recipeId });
@@ -180,6 +181,8 @@ export default function RecipeDetail() {
                             if (navigator.clipboard && window.isSecureContext) {
                               navigator.clipboard.writeText(url);
                               toast.success('連結已複製到剪貼板');
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
                             } else {
                               // Fallback method for HTTP
                               const textArea = document.createElement('textarea');
@@ -192,6 +195,8 @@ export default function RecipeDetail() {
                               try {
                                 document.execCommand('copy');
                                 toast.success('連結已複製到剪貼板');
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
                               } catch (err) {
                                 toast.error('複製失敗，請手動複製');
                               }
@@ -199,7 +204,7 @@ export default function RecipeDetail() {
                             }
                           }}
                         >
-                          複製
+                          {copied ? '✓ 已複製' : '複製'}
                         </Button>
                         <Button 
                           variant="outline" 
