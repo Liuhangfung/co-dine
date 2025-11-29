@@ -175,8 +175,28 @@ export default function RecipeDetail() {
                           variant="outline" 
                           size="sm"
                           onClick={() => {
-                            navigator.clipboard.writeText(recipe.sourceUrl || '');
-                            toast.success('連結已複製到剪貼板');
+                            const url = recipe.sourceUrl || '';
+                            // Fallback for non-HTTPS environments
+                            if (navigator.clipboard && window.isSecureContext) {
+                              navigator.clipboard.writeText(url);
+                              toast.success('連結已複製到剪貼板');
+                            } else {
+                              // Fallback method for HTTP
+                              const textArea = document.createElement('textarea');
+                              textArea.value = url;
+                              textArea.style.position = 'fixed';
+                              textArea.style.left = '-999999px';
+                              document.body.appendChild(textArea);
+                              textArea.focus();
+                              textArea.select();
+                              try {
+                                document.execCommand('copy');
+                                toast.success('連結已複製到剪貼板');
+                              } catch (err) {
+                                toast.error('複製失敗，請手動複製');
+                              }
+                              document.body.removeChild(textArea);
+                            }
                           }}
                         >
                           複製
@@ -683,41 +703,41 @@ export default function RecipeDetail() {
                     // 有完整的改良後營養數據，顯示詳細對比
                     <div className="space-y-6">
                       {/* Summary Cards */}
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {/* 原始食譜 */}
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="font-semibold text-gray-700 mb-3">原始食譜</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">總卡路里:</span>
-                              <span className="font-medium">{originalNutrition.totalCalories} kcal</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">蛋白質:</span>
-                              <span className="font-medium">{originalNutrition.protein} g</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">碳水化合物:</span>
-                              <span className="font-medium">{originalNutrition.carbs} g</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">脂肪:</span>
-                              <span className="font-medium">{originalNutrition.fat} g</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">纖維:</span>
-                              <span className="font-medium">{originalNutrition.fiber} g</span>
-                            </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* 原始食譜 */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-700 mb-3">原始食譜</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">總卡路里:</span>
+                            <span className="font-medium">{originalNutrition.totalCalories} kcal</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">蛋白質:</span>
+                            <span className="font-medium">{originalNutrition.protein} g</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">碳水化合物:</span>
+                            <span className="font-medium">{originalNutrition.carbs} g</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">脂肪:</span>
+                            <span className="font-medium">{originalNutrition.fat} g</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">纖維:</span>
+                            <span className="font-medium">{originalNutrition.fiber} g</span>
                           </div>
                         </div>
-                        
-                        {/* 改良後 */}
-                        <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
-                          <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                            <span>✨</span>
-                            米芝蓮級 AI 改良建議
-                          </h4>
-                          <div className="space-y-2 text-sm">
+                      </div>
+                      
+                      {/* 改良後 */}
+                      <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                        <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                          <span>✨</span>
+                          米芝蓮級 AI 改良建議
+                        </h4>
+                        <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-700">總卡路里:</span>
                             <span className={`font-medium ${
@@ -1036,10 +1056,10 @@ export default function RecipeDetail() {
                               </p>
                             </div>
                           )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
                   ) : (
                     // 沒有改良後營養數據，只顯示原始數據和提示
                     <div className="text-center py-8">

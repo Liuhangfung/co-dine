@@ -121,8 +121,28 @@ export default function BrowseDetail() {
                           variant="outline" 
                           size="sm"
                           onClick={() => {
-                            navigator.clipboard.writeText(recipe.sourceUrl || '');
-                            toast.success('連結已複製到剪貼板');
+                            const url = recipe.sourceUrl || '';
+                            // Fallback for non-HTTPS environments
+                            if (navigator.clipboard && window.isSecureContext) {
+                              navigator.clipboard.writeText(url);
+                              toast.success('連結已複製到剪貼板');
+                            } else {
+                              // Fallback method for HTTP
+                              const textArea = document.createElement('textarea');
+                              textArea.value = url;
+                              textArea.style.position = 'fixed';
+                              textArea.style.left = '-999999px';
+                              document.body.appendChild(textArea);
+                              textArea.focus();
+                              textArea.select();
+                              try {
+                                document.execCommand('copy');
+                                toast.success('連結已複製到剪貼板');
+                              } catch (err) {
+                                toast.error('複製失敗，請手動複製');
+                              }
+                              document.body.removeChild(textArea);
+                            }
                           }}
                         >
                           複製
@@ -340,8 +360,8 @@ export default function BrowseDetail() {
                     <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                       <p className="font-medium text-green-900">✓ 低碳水</p>
                       <p className="text-sm text-green-700 mt-1">{recipe.carbs}g 碳水化合物，適合低碳飲食和血糖管理</p>
-                    </div>
-                  )}
+                </div>
+              )}
                 </div>
               </div>
 
@@ -380,8 +400,8 @@ export default function BrowseDetail() {
                     <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <p className="font-medium text-orange-900">ℹ 纖維較低</p>
                       <p className="text-sm text-orange-700 mt-1">{recipe.fiber}g 纖維，建議增加蔬菜或全穀物</p>
-                    </div>
-                  )}
+                </div>
+              )}
                 </div>
               </div>
             </div>
