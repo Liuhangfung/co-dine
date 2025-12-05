@@ -74,8 +74,88 @@ export async function scrapeWebpage(url: string): Promise<ScrapedContent> {
       await page.waitForTimeout(5000);
     }
     
-    // 提取標題
-    const title = await page.title();
+    // 提取標題 - 嘗試多種方式
+    let title = await page.title();
+    
+    // 如果標題為空或太短，嘗試從其他元素提取
+    if (!title || title.trim().length < 3) {
+      console.log('[WebScraper/scrapeWebpage] ⚠️  Page title is empty or too short, trying alternative methods...');
+      
+      // 嘗試從 h1 標籤提取
+      const h1Title = await page.evaluate(() => {
+        const h1 = document.querySelector('h1');
+        return h1 ? (h1.innerText || h1.textContent || '').trim() : '';
+      });
+      
+      if (h1Title && h1Title.length > 3) {
+        title = h1Title;
+        console.log('[WebScraper/scrapeWebpage] ✅ Extracted title from h1:', title);
+      } else {
+        // 嘗試從 meta og:title 提取
+        const ogTitle = await page.evaluate(() => {
+          const meta = document.querySelector('meta[property="og:title"]');
+          return meta ? (meta.getAttribute('content') || '').trim() : '';
+        });
+        
+        if (ogTitle && ogTitle.length > 3) {
+          title = ogTitle;
+          console.log('[WebScraper/scrapeWebpage] ✅ Extracted title from og:title:', title);
+        } else {
+          // 嘗試從 meta title 提取
+          const metaTitle = await page.evaluate(() => {
+            const meta = document.querySelector('meta[name="title"]');
+            return meta ? (meta.getAttribute('content') || '').trim() : '';
+          });
+          
+          if (metaTitle && metaTitle.length > 3) {
+            title = metaTitle;
+            console.log('[WebScraper/scrapeWebpage] ✅ Extracted title from meta[name="title"]:', title);
+          }
+        }
+      }
+    }
+    
+    // YouTube 特殊處理 - 嘗試從頁面元素提取視頻標題
+    if (isYouTube && (!title || title.includes('YouTube') || title.length < 10)) {
+      console.log('[WebScraper/scrapeWebpage] 🎥 YouTube detected, trying to extract video title from page...');
+      
+      const youtubeTitle = await page.evaluate(() => {
+        // 嘗試多種 YouTube 標題選擇器
+        const selectors = [
+          'h1.ytd-watch-metadata yt-formatted-string',
+          'h1.ytd-watch-metadata',
+          'h1.ytd-video-primary-info-renderer',
+          'h1[class*="title"]',
+          'h1',
+          '[id="title"]',
+          '[class*="title"]',
+          'meta[property="og:title"]'
+        ];
+        
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            const text = element.getAttribute('content') || 
+                        element.getAttribute('title') || 
+                        (element as HTMLElement).innerText || 
+                        (element as HTMLElement).textContent || '';
+            if (text && text.trim().length > 5 && !text.includes('YouTube')) {
+              return text.trim();
+            }
+          }
+        }
+        return '';
+      });
+      
+      if (youtubeTitle && youtubeTitle.length > 5) {
+        title = youtubeTitle;
+        console.log('[WebScraper/scrapeWebpage] ✅ Extracted YouTube video title:', title);
+      } else {
+        console.log('[WebScraper/scrapeWebpage] ⚠️  Could not extract YouTube video title from page elements');
+      }
+    }
+    
+    console.log('[WebScraper/scrapeWebpage] 📝 Final extracted title:', title || '(empty)');
     
     // 提取主要文本內容（優先尋找食譜相關區域）
     const content = await page.evaluate((isXHS) => {
@@ -171,7 +251,14 @@ export async function scrapeWebpage(url: string): Promise<ScrapedContent> {
     
     if (isYouTube) {
       console.log(`[WebScraper/scrapeWebpage] 🎥 YouTube detected, extracting transcript using Supadata...`);
-      videoTranscript = await getYouTubeTranscriptWithSupadata(url);
+      const transcriptResult = await getYouTubeTranscriptWithSupadata(url);
+      videoTranscript = transcriptResult.transcript;
+      
+      // Use extracted title if available and current title is not good
+      if (transcriptResult.title && (!title || title.includes('YouTube') || title.length < 10)) {
+        title = transcriptResult.title;
+        console.log(`[WebScraper/scrapeWebpage] ✅ Using title from YouTube API: ${title}`);
+      }
       
       if (videoTranscript && videoTranscript.length > 50) {
         console.log(`[WebScraper/scrapeWebpage] ✅ YouTube transcript extracted: ${videoTranscript.length} characters`);
@@ -235,8 +322,9 @@ function extractYouTubeVideoId(url: string): string | null {
 
 /**
  * Get YouTube transcript using Supadata API
+ * Returns an object with transcript and title (if available)
  */
-async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
+async function getYouTubeTranscriptWithSupadata(url: string): Promise<{ transcript: string; title?: string }> {
   console.log('[YouTube Transcript] 🎬 Starting transcript extraction for:', url);
   
   try {
@@ -244,7 +332,7 @@ async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
     const videoId = extractYouTubeVideoId(url);
     if (!videoId) {
       console.log('[YouTube Transcript] ❌ Could not extract video ID from URL');
-      return '';
+      return { transcript: '', title: undefined };
     }
     
     console.log('[YouTube Transcript] 🆔 Video ID:', videoId);
@@ -254,7 +342,7 @@ async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
     
     if (!apiToken) {
       console.log('[YouTube Transcript] ❌ API token not configured');
-      return '';
+      return { transcript: '', title: undefined };
     }
     
     console.log('[YouTube Transcript] ⏳ Calling youtube-transcript.io API...');
@@ -284,14 +372,24 @@ async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
     const data = await response.json();
     console.log('[YouTube Transcript] 📋 Response structure:', JSON.stringify(data).substring(0, 500));
     
-    // Extract transcript from response
+    // Extract transcript and title from response
     let transcriptText: string | null = null;
+    let videoTitle: string | undefined = undefined;
     
     if (data && Array.isArray(data) && data.length > 0) {
       // If response is an array of transcripts
       const transcript = data[0];
       console.log('[YouTube Transcript] 📝 Found transcript in array format');
       console.log('[YouTube Transcript]   Transcript keys:', Object.keys(transcript));
+      
+      // Extract title from response
+      if (transcript.title && typeof transcript.title === 'string' && transcript.title.length > 3) {
+        videoTitle = transcript.title.trim();
+        console.log('[YouTube Transcript] 📺 Extracted video title:', videoTitle);
+      } else if (transcript.microformat?.playerMicroformatRenderer?.title?.simpleText) {
+        videoTitle = transcript.microformat.playerMicroformatRenderer.title.simpleText.trim();
+        console.log('[YouTube Transcript] 📺 Extracted video title from microformat:', videoTitle);
+      }
       
       // Check for tracks array (contains transcript segments)
       console.log('[YouTube Transcript]   Checking tracks:', {
@@ -364,12 +462,12 @@ async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
       console.log(`[YouTube Transcript] ✅ Success! Transcript extracted (${transcriptText.length} characters)`);
       console.log('[YouTube Transcript] 📄 Preview (first 500 chars):');
       console.log('[YouTube Transcript]   ' + transcriptText.substring(0, 500).replace(/\n/g, ' '));
-      return transcriptText;
+      return { transcript: transcriptText, title: videoTitle };
     }
     
     console.log('[YouTube Transcript] ⚠️  No transcript content found in response');
     console.log('[YouTube Transcript] 📋 Full response:', JSON.stringify(data, null, 2).substring(0, 1000));
-    return '';
+    return { transcript: '', title: videoTitle };
   } catch (error) {
     console.error('[YouTube Transcript] ❌ Error occurred:');
     console.error('[YouTube Transcript]   Error type:', error instanceof Error ? error.constructor.name : typeof error);
@@ -377,7 +475,7 @@ async function getYouTubeTranscriptWithSupadata(url: string): Promise<string> {
     if (error instanceof Error && error.stack) {
       console.error('[YouTube Transcript]   Stack trace:', error.stack.substring(0, 500));
     }
-    return '';
+    return { transcript: '', title: undefined };
   }
 }
 
@@ -399,15 +497,19 @@ export async function simpleFetch(url: string): Promise<ScrapedContent> {
       
       // Try to get transcript from YouTube Transcript API
       console.log('[WebScraper/simpleFetch] ⏳ Calling getYouTubeTranscriptWithSupadata()...');
-      const transcript = await getYouTubeTranscriptWithSupadata(url);
+      const transcriptResult = await getYouTubeTranscriptWithSupadata(url);
+      const transcript = transcriptResult.transcript;
       
       if (transcript && transcript.length > 50) {
         console.log('[WebScraper/simpleFetch] ✅ Transcript extraction successful!');
         console.log(`[WebScraper/simpleFetch] 📊 Transcript length: ${transcript.length} characters`);
         
-        // Extract title from YouTube URL or use default
-        const videoId = extractYouTubeVideoId(url);
-        const title = videoId ? `YouTube Video - ${videoId}` : 'YouTube Video';
+        // Use title from API if available, otherwise use video ID
+        let title = transcriptResult.title;
+        if (!title || title.length < 5) {
+          const videoId = extractYouTubeVideoId(url);
+          title = videoId ? `YouTube Video - ${videoId}` : 'YouTube Video';
+        }
         console.log('[WebScraper/simpleFetch] 📝 Title:', title);
         
         const result = {
@@ -448,10 +550,77 @@ export async function simpleFetch(url: string): Promise<ScrapedContent> {
     const html = await response.text();
     console.log('[WebScraper/simpleFetch] 📊 HTML length:', html.length, 'characters');
     
-    // 簡單的HTML解析
+    // 簡單的HTML解析 - 嘗試多種方式提取標題
+    let title = '';
+    
+    // 方法1: 從 <title> 標籤提取
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1] : '';
-    console.log('[WebScraper/simpleFetch] 📝 Extracted title:', title || '(not found)');
+    if (titleMatch && titleMatch[1]) {
+      title = titleMatch[1].trim();
+      // 清理標題（移除 YouTube 後綴等）
+      title = title.replace(/\s*-\s*YouTube\s*$/i, '').trim();
+      title = title.replace(/\s*-\s*YouTube\s*$/i, '').trim(); // 重複一次以防萬一
+    }
+    
+    // 方法2: 如果標題為空或太短，嘗試從 og:title meta 標籤提取
+    if (!title || title.length < 3) {
+      const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
+      if (ogTitleMatch && ogTitleMatch[1]) {
+        title = ogTitleMatch[1].trim();
+        console.log('[WebScraper/simpleFetch] ✅ Extracted title from og:title:', title);
+      }
+    }
+    
+    // 方法3: 嘗試從 h1 標籤提取（需要解析 HTML）
+    if (!title || title.length < 3) {
+      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      if (h1Match && h1Match[1]) {
+        title = h1Match[1].trim();
+        console.log('[WebScraper/simpleFetch] ✅ Extracted title from h1:', title);
+      }
+    }
+    
+    // 方法4: YouTube 特殊處理 - 嘗試從 JSON-LD 或內嵌數據提取
+    if (isYouTube && (!title || title.includes('YouTube') || title.length < 10)) {
+      console.log('[WebScraper/simpleFetch] 🎥 YouTube detected, trying to extract video title from HTML...');
+      
+      // 嘗試從 JSON-LD 結構化數據提取
+      const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (jsonLdMatch && jsonLdMatch[1]) {
+        try {
+          const jsonLd = JSON.parse(jsonLdMatch[1]);
+          if (jsonLd.name && typeof jsonLd.name === 'string' && jsonLd.name.length > 5) {
+            title = jsonLd.name.trim();
+            console.log('[WebScraper/simpleFetch] ✅ Extracted YouTube title from JSON-LD:', title);
+          }
+        } catch (e) {
+          // JSON 解析失敗，繼續嘗試其他方法
+        }
+      }
+      
+      // 嘗試從 var ytInitialData 提取
+      if (!title || title.length < 10) {
+        const ytDataMatch = html.match(/var\s+ytInitialData\s*=\s*({[\s\S]*?});/);
+        if (ytDataMatch && ytDataMatch[1]) {
+          try {
+            const ytData = JSON.parse(ytDataMatch[1]);
+            // YouTube 數據結構複雜，嘗試多個路徑
+            const videoDetails = ytData?.contents?.twoColumnWatchNextResults?.results?.results?.contents?.[0]?.videoPrimaryInfoRenderer?.title?.runs?.[0]?.text ||
+                                ytData?.videoDetails?.title ||
+                                ytData?.playerResponse?.videoDetails?.title;
+            
+            if (videoDetails && typeof videoDetails === 'string' && videoDetails.length > 5) {
+              title = videoDetails.trim();
+              console.log('[WebScraper/simpleFetch] ✅ Extracted YouTube title from ytInitialData:', title);
+            }
+          } catch (e) {
+            // JSON 解析失敗
+          }
+        }
+      }
+    }
+    
+    console.log('[WebScraper/simpleFetch] 📝 Final extracted title:', title || '(not found)');
     
     // 移除HTML標籤獲取純文本
     console.log('[WebScraper/simpleFetch] 🧹 Cleaning HTML (removing scripts, styles, tags)...');

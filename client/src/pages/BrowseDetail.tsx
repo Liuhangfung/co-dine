@@ -3,18 +3,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Link, useParams } from "wouter";
-import { ArrowLeft, Utensils, Flame, Beef, Cookie, Droplet, Users, Clock, ThumbsUp, ThumbsDown, Star, CheckCircle2, GitCompare } from "lucide-react";
+import { ArrowLeft, Utensils, Flame, Beef, Cookie, Droplet, Users, Clock, ThumbsUp, ThumbsDown, Star, CheckCircle2, GitCompare, Edit } from "lucide-react";
 import { APP_TITLE } from "@/const";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 import { useState } from "react";
+import { EditRecipeDialog } from "@/components/EditRecipeDialog";
 
 export default function BrowseDetail() {
   const params = useParams<{ id: string }>();
   const recipeId = parseInt(params.id || "0");
   const [copied, setCopied] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogTab, setEditDialogTab] = useState<"basic" | "categories" | "ingredients" | "steps" | "ai-improvements">("basic");
 
-  const { data: recipe, isLoading } = trpc.recipes.getPublicById.useQuery({ id: recipeId });
+  const { data: recipe, isLoading, refetch: refetchPublicRecipe } = trpc.recipes.getPublicById.useQuery({ id: recipeId });
+  // Also fetch full recipe data for editing
+  const { data: fullRecipe, refetch: refetchFullRecipe } = trpc.recipes.getById.useQuery({ id: recipeId }, { enabled: editDialogOpen });
+  const { data: allCategories } = trpc.categories.list.useQuery();
 
   if (isLoading) {
     return (
@@ -54,12 +60,22 @@ export default function BrowseDetail() {
                 返回瀏覽
               </Button>
             </Link>
-            <Link href="/">
-              <div className="flex items-center gap-2 cursor-pointer">
-                <Utensils className="h-5 w-5 text-green-600" />
-                <span className="font-semibold text-gray-900">{APP_TITLE}</span>
-              </div>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setEditDialogOpen(true)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                編輯
+              </Button>
+              <Link href="/">
+                <div className="flex items-center gap-2 cursor-pointer">
+                  <Utensils className="h-5 w-5 text-green-600" />
+                  <span className="font-semibold text-gray-900">{APP_TITLE}</span>
+                </div>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
@@ -76,19 +92,43 @@ export default function BrowseDetail() {
               />
             </div>
           )}
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{recipe.title}</h1>
-          {recipe.description && (
-            <p className="text-lg text-gray-600 mb-4">{recipe.description}</p>
-          )}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">{recipe.title}</h1>
+              {recipe.description && (
+                <p className="text-lg text-gray-600 mb-4">{recipe.description}</p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
 
           {/* Categories */}
           {recipe.categories && recipe.categories.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4 items-center">
               {recipe.categories.map(cat => (
                 <Badge key={cat.id} variant="secondary">
                   {cat.name}
                 </Badge>
               ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditDialogTab("categories");
+                  setEditDialogOpen(true);
+                }}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </div>
@@ -172,7 +212,18 @@ export default function BrowseDetail() {
 
         {/* Metadata - Servings and Calories */}
         <div className="grid md:grid-cols-3 gap-4 mb-8">
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -185,7 +236,18 @@ export default function BrowseDetail() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -200,7 +262,18 @@ export default function BrowseDetail() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -221,7 +294,19 @@ export default function BrowseDetail() {
         {(recipe.difficulty || recipe.prepTime || recipe.cookTime || recipe.totalTime || recipe.requiredEquipment) && (
           <Card className="mb-8 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
             <CardHeader>
-              <CardTitle className="text-amber-900">烹飪信息</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-amber-900">烹飪信息</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("basic");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -288,7 +373,19 @@ export default function BrowseDetail() {
         {(recipe.protein || recipe.carbs || recipe.fat || recipe.fiber) && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>營養成分</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>營養成分</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("basic");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-4 gap-4">
@@ -324,11 +421,25 @@ export default function BrowseDetail() {
         {/* Nutrition Benefits & Concerns */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              營養分析
-            </CardTitle>
-            <CardDescription>詳細的營養好處和需要注意的地方</CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  營養分析
+                </CardTitle>
+                <CardDescription>詳細的營養好處和需要注意的地方</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditDialogTab("basic");
+                  setEditDialogOpen(true);
+                }}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-6">
@@ -450,8 +561,22 @@ export default function BrowseDetail() {
         {recipe.ingredients && recipe.ingredients.length > 0 && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>食材清單</CardTitle>
-              <CardDescription>所需材料</CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle>食材清單</CardTitle>
+                  <CardDescription>所需材料</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("ingredients");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -475,8 +600,22 @@ export default function BrowseDetail() {
         {recipe.steps && recipe.steps.length > 0 && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>烹飪步驟</CardTitle>
-              <CardDescription>詳細製作過程</CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle>烹飪步驟</CardTitle>
+                  <CardDescription>詳細製作過程</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("steps");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -538,11 +677,25 @@ export default function BrowseDetail() {
           return (
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-2xl">👨‍🍳</span>
-                  米芝蓮級 AI 改良建議
-                </CardTitle>
-                <CardDescription>專業大廚的優化建議</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-2xl">👨‍🍳</span>
+                      米芝蓮級 AI 改良建議
+                    </CardTitle>
+                    <CardDescription>專業大廚的優化建議</CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditDialogTab("ai-improvements");
+                      setEditDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="prose max-w-none">
@@ -592,11 +745,25 @@ export default function BrowseDetail() {
             return (
               <Card className="mb-8">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GitCompare className="w-5 h-5 text-green-600" />
-                    營養成分對比
-                  </CardTitle>
-                  <CardDescription>原始食譜 vs 米芝蓮級 AI 改良建議</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2">
+                        <GitCompare className="w-5 h-5 text-green-600" />
+                        營養成分對比
+                      </CardTitle>
+                      <CardDescription>原始食譜 vs 米芝蓮級 AI 改良建議</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditDialogTab("ai-improvements");
+                        setEditDialogOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {improvedNutrition && 
@@ -790,6 +957,58 @@ export default function BrowseDetail() {
           <p>© 2025 {APP_TITLE}. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Edit Recipe Dialog */}
+      {fullRecipe && allCategories && (
+        <EditRecipeDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          recipe={{
+            id: fullRecipe.id,
+            title: fullRecipe.title,
+            description: fullRecipe.description,
+            servings: fullRecipe.servings || 1,
+            difficulty: fullRecipe.difficulty,
+            prepTime: fullRecipe.prepTime,
+            cookTime: fullRecipe.cookTime,
+            totalTime: fullRecipe.totalTime,
+            requiredEquipment: fullRecipe.requiredEquipment,
+            totalCalories: fullRecipe.totalCalories,
+            caloriesPerServing: fullRecipe.caloriesPerServing,
+            protein: fullRecipe.protein,
+            carbs: fullRecipe.carbs,
+            fat: fullRecipe.fat,
+            fiber: fullRecipe.fiber,
+            isPublished: fullRecipe.isPublished || false,
+            improvementSuggestions: fullRecipe.improvementSuggestions || null,
+            aiAnalysis: fullRecipe.aiAnalysis || null,
+          }}
+          ingredients={fullRecipe.ingredients.map(ing => ({
+            id: ing.id,
+            name: ing.name,
+            amount: ing.amount,
+            unit: ing.unit,
+            calories: ing.calories,
+            notes: ing.notes,
+            order: ing.order || 0,
+          }))}
+          steps={fullRecipe.steps.map(step => ({
+            id: step.id,
+            instruction: step.instruction,
+            duration: step.duration,
+            temperature: step.temperature,
+            tips: step.tips,
+            order: step.stepNumber,
+          }))}
+          categories={allCategories}
+          selectedCategoryIds={fullRecipe.categories.map(c => c.id)}
+          defaultTab={editDialogTab}
+          onSuccess={() => {
+            refetchPublicRecipe();
+            refetchFullRecipe();
+          }}
+        />
+      )}
     </div>
   );
 }

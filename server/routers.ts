@@ -98,6 +98,8 @@ const updateRecipeSchema = z.object({
   carbs: z.number().optional(),
   fat: z.number().optional(),
   fiber: z.number().optional(),
+  improvementSuggestions: z.string().optional(),
+  aiAnalysis: z.string().optional(),
 });
 
 const updateIngredientSchema = z.object({

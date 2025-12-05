@@ -29,6 +29,8 @@ interface Recipe {
   fat: number | null;
   fiber: number | null;
   isPublished: boolean;
+  improvementSuggestions?: string | null;
+  aiAnalysis?: string | null;
 }
 
 interface Ingredient {
@@ -64,6 +66,7 @@ interface EditRecipeDialogProps {
   categories: Category[];
   selectedCategoryIds: number[];
   onSuccess: () => void;
+  defaultTab?: "basic" | "categories" | "ingredients" | "steps" | "ai-improvements";
 }
 
 export function EditRecipeDialog({
@@ -75,6 +78,7 @@ export function EditRecipeDialog({
   categories,
   selectedCategoryIds,
   onSuccess,
+  defaultTab = "basic",
 }: EditRecipeDialogProps) {
   const [basicInfo, setBasicInfo] = useState({
     title: recipe.title,
@@ -106,11 +110,26 @@ export function EditRecipeDialog({
   const [editedIngredients, setEditedIngredients] = useState<Ingredient[]>([]);
   const [editedSteps, setEditedSteps] = useState<CookingStep[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [improvementSuggestions, setImprovementSuggestions] = useState<string>("");
+  const [improvedNutrition, setImprovedNutrition] = useState<{
+    calories: number | null;
+    protein: number | null;
+    carbs: number | null;
+    fat: number | null;
+    fiber: number | null;
+  }>({
+    calories: null,
+    protein: null,
+    carbs: null,
+    fat: null,
+    fiber: null,
+  });
   const [showComparison, setShowComparison] = useState(false);
   const [nutritionComparison, setNutritionComparison] = useState<{
     old: any;
     new: any;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"basic" | "categories" | "ingredients" | "steps" | "ai-improvements">(defaultTab || "basic");
 
   useEffect(() => {
     setBasicInfo({
@@ -141,7 +160,30 @@ export function EditRecipeDialog({
     setEditedIngredients(ingredients);
     setEditedSteps(steps);
     setSelectedCategories(selectedCategoryIds);
+    setImprovementSuggestions(recipe.improvementSuggestions || "");
+    
+    // Parse aiAnalysis to extract improvedNutrition
+    if (recipe.aiAnalysis) {
+      try {
+        const aiAnalysis = JSON.parse(recipe.aiAnalysis);
+        if (aiAnalysis.improvedNutrition) {
+          setImprovedNutrition({
+            calories: aiAnalysis.improvedNutrition.calories || null,
+            protein: aiAnalysis.improvedNutrition.protein || null,
+            carbs: aiAnalysis.improvedNutrition.carbs || null,
+            fat: aiAnalysis.improvedNutrition.fat || null,
+            fiber: aiAnalysis.improvedNutrition.fiber || null,
+          });
+        }
+      } catch (error) {
+        console.error('[EditRecipeDialog] Failed to parse aiAnalysis:', error);
+      }
+    }
   }, [recipe, ingredients, steps, selectedCategoryIds]);
+
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   const updateRecipeMutation = trpc.recipes.update.useMutation();
   const updateIngredientMutation = trpc.recipes.updateIngredient.useMutation();
@@ -180,6 +222,26 @@ export function EditRecipeDialog({
         fat: recipe.fat,
         fiber: recipe.fiber,
       };
+      // 構建更新的 aiAnalysis JSON
+      let updatedAiAnalysis: string | undefined = undefined;
+      if (recipe.aiAnalysis || improvedNutrition.calories !== null || improvedNutrition.protein !== null) {
+        try {
+          const existingAiAnalysis = recipe.aiAnalysis ? JSON.parse(recipe.aiAnalysis) : {};
+          updatedAiAnalysis = JSON.stringify({
+            ...existingAiAnalysis,
+            improvedNutrition: {
+              calories: improvedNutrition.calories ?? existingAiAnalysis.improvedNutrition?.calories ?? null,
+              protein: improvedNutrition.protein ?? existingAiAnalysis.improvedNutrition?.protein ?? null,
+              carbs: improvedNutrition.carbs ?? existingAiAnalysis.improvedNutrition?.carbs ?? null,
+              fat: improvedNutrition.fat ?? existingAiAnalysis.improvedNutrition?.fat ?? null,
+              fiber: improvedNutrition.fiber ?? existingAiAnalysis.improvedNutrition?.fiber ?? null,
+            },
+          });
+        } catch (error) {
+          console.error('[EditRecipeDialog] Failed to parse/update aiAnalysis:', error);
+        }
+      }
+
       // 更新基本資訊和營養資訊
       await updateRecipeMutation.mutateAsync({
         id: recipe.id,
@@ -198,6 +260,8 @@ export function EditRecipeDialog({
         carbs: nutrition.carbs,
         fat: nutrition.fat,
         fiber: nutrition.fiber,
+        improvementSuggestions: improvementSuggestions || undefined,
+        aiAnalysis: updatedAiAnalysis,
       });
 
       // 更新食材
@@ -272,12 +336,13 @@ export function EditRecipeDialog({
           <DialogTitle>編輯食譜</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">基本資訊</TabsTrigger>
             <TabsTrigger value="ingredients">食材</TabsTrigger>
             <TabsTrigger value="steps">步驟</TabsTrigger>
             <TabsTrigger value="categories">分類</TabsTrigger>
+            <TabsTrigger value="ai-improvements">AI 改良</TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
@@ -578,6 +643,84 @@ export function EditRecipeDialog({
                   <Label htmlFor={`category-${category.id}`}>{category.name}</Label>
                 </div>
               ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="ai-improvements" className="space-y-4">
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-semibold mb-4">米芝蓮級 AI 改良建議</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="improvementSuggestions">改良建議內容</Label>
+                  <Textarea
+                    id="improvementSuggestions"
+                    value={improvementSuggestions}
+                    onChange={(e) => setImprovementSuggestions(e.target.value)}
+                    rows={8}
+                    placeholder="輸入 AI 改良建議內容..."
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500">此欄位用於編輯 AI 生成的改良建議內容</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="font-semibold mb-4">米芝蓮級 AI 改良後營養成分</h3>
+                <p className="text-sm text-gray-600 mb-4">編輯改良後的營養數值（用於營養成分對比）</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="improvedCalories">改良後總卡路里 (kcal)</Label>
+                    <Input
+                      id="improvedCalories"
+                      type="number"
+                      value={improvedNutrition.calories || ""}
+                      onChange={(e) => setImprovedNutrition({ ...improvedNutrition, calories: e.target.value ? parseFloat(e.target.value) : null })}
+                      placeholder="例如: 205"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="improvedProtein">改良後蛋白質 (g)</Label>
+                    <Input
+                      id="improvedProtein"
+                      type="number"
+                      value={improvedNutrition.protein || ""}
+                      onChange={(e) => setImprovedNutrition({ ...improvedNutrition, protein: e.target.value ? parseFloat(e.target.value) : null })}
+                      placeholder="例如: 21"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="improvedCarbs">改良後碳水化合物 (g)</Label>
+                    <Input
+                      id="improvedCarbs"
+                      type="number"
+                      value={improvedNutrition.carbs || ""}
+                      onChange={(e) => setImprovedNutrition({ ...improvedNutrition, carbs: e.target.value ? parseFloat(e.target.value) : null })}
+                      placeholder="例如: 28"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="improvedFat">改良後脂肪 (g)</Label>
+                    <Input
+                      id="improvedFat"
+                      type="number"
+                      value={improvedNutrition.fat || ""}
+                      onChange={(e) => setImprovedNutrition({ ...improvedNutrition, fat: e.target.value ? parseFloat(e.target.value) : null })}
+                      placeholder="例如: 8"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="improvedFiber">改良後纖維 (g)</Label>
+                    <Input
+                      id="improvedFiber"
+                      type="number"
+                      value={improvedNutrition.fiber || ""}
+                      onChange={(e) => setImprovedNutrition({ ...improvedNutrition, fiber: e.target.value ? parseFloat(e.target.value) : null })}
+                      placeholder="例如: 7"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">這些數值將用於顯示營養成分對比</p>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

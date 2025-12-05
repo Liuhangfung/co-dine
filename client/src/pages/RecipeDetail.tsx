@@ -19,6 +19,7 @@ export default function RecipeDetail() {
   const [, setLocation] = useLocation();
   const recipeId = parseInt(params.id || "0");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogTab, setEditDialogTab] = useState<"basic" | "categories" | "ingredients" | "steps" | "ai-improvements">("basic");
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [substitutionDialogOpen, setSubstitutionDialogOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<{ id: number; name: string } | null>(null);
@@ -95,7 +96,10 @@ export default function RecipeDetail() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
+            <Button variant="outline" onClick={() => {
+              setEditDialogTab("basic");
+              setEditDialogOpen(true);
+            }}>
               <Edit className="w-4 h-4 mr-2" />
               編輯
             </Button>
@@ -235,7 +239,18 @@ export default function RecipeDetail() {
 
         {/* Metadata */}
         <div className="grid md:grid-cols-3 gap-4">
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -248,7 +263,18 @@ export default function RecipeDetail() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -263,7 +289,18 @@ export default function RecipeDetail() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0"
+              onClick={() => {
+                setEditDialogTab("basic");
+                setEditDialogOpen(true);
+              }}
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -284,7 +321,19 @@ export default function RecipeDetail() {
         {(recipe.difficulty || recipe.prepTime || recipe.cookTime || recipe.totalTime || recipe.requiredEquipment) && (
           <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
             <CardHeader>
-              <CardTitle className="text-amber-900">烹飪信息</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-amber-900">烹飪信息</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("basic");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -351,7 +400,19 @@ export default function RecipeDetail() {
         {(recipe.protein || recipe.carbs || recipe.fat || recipe.fiber) && (
           <Card>
             <CardHeader>
-              <CardTitle>營養成分</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>營養成分</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("basic");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-4 gap-4">
@@ -387,11 +448,25 @@ export default function RecipeDetail() {
         {/* Nutrition Benefits & Concerns */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              營養分析
-            </CardTitle>
-            <CardDescription>詳細的營養好處和需要注意的地方</CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  營養分析
+                </CardTitle>
+                <CardDescription>詳細的營養好處和需要注意的地方</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditDialogTab("basic");
+                  setEditDialogOpen(true);
+                }}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 gap-6">
@@ -513,7 +588,19 @@ export default function RecipeDetail() {
         {recipe.categories && recipe.categories.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>分類標籤</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>分類標籤</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("categories");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -531,8 +618,22 @@ export default function RecipeDetail() {
         {recipe.ingredients && recipe.ingredients.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>食材清單</CardTitle>
-              <CardDescription>所需材料</CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle>食材清單</CardTitle>
+                  <CardDescription>所需材料</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("ingredients");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -564,8 +665,22 @@ export default function RecipeDetail() {
         {recipe.steps && recipe.steps.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>烹飪步驟</CardTitle>
-              <CardDescription>詳細製作過程</CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle>烹飪步驟</CardTitle>
+                  <CardDescription>詳細製作過程</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditDialogTab("steps");
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -629,11 +744,25 @@ export default function RecipeDetail() {
           return (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-2xl">👨‍🍳</span>
-                  米芝蓮級 AI 改良建議
-                </CardTitle>
-                <CardDescription>專業大廚的優化建議</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-2xl">👨‍🍳</span>
+                      米芝蓮級 AI 改良建議
+                    </CardTitle>
+                    <CardDescription>專業大廚的優化建議</CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditDialogTab("ai-improvements");
+                      setEditDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="prose max-w-none">
@@ -692,11 +821,25 @@ export default function RecipeDetail() {
             return (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GitCompare className="w-5 h-5 text-green-600" />
-                    營養成分對比
-                  </CardTitle>
-                  <CardDescription>原始食譜 vs 米芝蓮級 AI 改良建議</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2">
+                        <GitCompare className="w-5 h-5 text-green-600" />
+                        營養成分對比
+                      </CardTitle>
+                      <CardDescription>原始食譜 vs 米芝蓮級 AI 改良建議</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditDialogTab("ai-improvements");
+                        setEditDialogOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {improvedNutrition && 
@@ -1287,6 +1430,11 @@ export default function RecipeDetail() {
             title: recipe.title,
             description: recipe.description,
             servings: recipe.servings || 1,
+            difficulty: recipe.difficulty,
+            prepTime: recipe.prepTime,
+            cookTime: recipe.cookTime,
+            totalTime: recipe.totalTime,
+            requiredEquipment: recipe.requiredEquipment,
             totalCalories: recipe.totalCalories,
             caloriesPerServing: recipe.caloriesPerServing,
             protein: recipe.protein,
@@ -1294,6 +1442,8 @@ export default function RecipeDetail() {
             fat: recipe.fat,
             fiber: recipe.fiber,
             isPublished: recipe.isPublished || false,
+            improvementSuggestions: recipe.improvementSuggestions || null,
+            aiAnalysis: recipe.aiAnalysis || null,
           }}
           ingredients={recipe.ingredients.map(ing => ({
             id: ing.id,
@@ -1314,6 +1464,7 @@ export default function RecipeDetail() {
           }))}
           categories={allCategories || []}
           selectedCategoryIds={recipe.categories.map(c => c.id)}
+          defaultTab={editDialogTab}
           onSuccess={() => {
             refetch();
           }}
