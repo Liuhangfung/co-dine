@@ -210,8 +210,10 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () => {
-  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
-    const baseUrl = ENV.forgeApiUrl.replace(/\/$/, "");
+  // Use process.env as fallback if ENV object doesn't have value
+  const apiUrl = ENV.forgeApiUrl || process.env.BUILT_IN_FORGE_API_URL || '';
+  if (apiUrl && apiUrl.trim().length > 0) {
+    const baseUrl = apiUrl.replace(/\/$/, "");
     // Perplexity uses OpenAI-compatible format with /v1/chat/completions
     if (baseUrl.includes('api.perplexity.ai')) {
       return `${baseUrl}/chat/completions`;
@@ -231,11 +233,28 @@ const resolveApiUrl = () => {
 };
 
 const checkApiKey = () => {
-  if (!ENV.forgeApiKey || !ENV.forgeApiUrl) {
+  console.log('[LLM] 🔍 Checking API configuration...');
+  console.log('[LLM]   - ENV.forgeApiKey exists:', !!ENV.forgeApiKey);
+  console.log('[LLM]   - ENV.forgeApiKey length:', ENV.forgeApiKey?.length || 0);
+  console.log('[LLM]   - ENV.forgeApiUrl exists:', !!ENV.forgeApiUrl);
+  console.log('[LLM]   - ENV.forgeApiUrl value:', ENV.forgeApiUrl || '(empty)');
+  console.log('[LLM]   - process.env.BUILT_IN_FORGE_API_KEY exists:', !!process.env.BUILT_IN_FORGE_API_KEY);
+  console.log('[LLM]   - process.env.BUILT_IN_FORGE_API_KEY length:', process.env.BUILT_IN_FORGE_API_KEY?.length || 0);
+  console.log('[LLM]   - process.env.BUILT_IN_FORGE_API_URL exists:', !!process.env.BUILT_IN_FORGE_API_URL);
+  console.log('[LLM]   - process.env.BUILT_IN_FORGE_API_URL value:', process.env.BUILT_IN_FORGE_API_URL || '(empty)');
+  
+  // Try to use process.env directly if ENV object doesn't have them
+  const apiKey = ENV.forgeApiKey || process.env.BUILT_IN_FORGE_API_KEY || '';
+  const apiUrl = ENV.forgeApiUrl || process.env.BUILT_IN_FORGE_API_URL || '';
+  
+  if (!apiKey || !apiUrl) {
+    console.error('[LLM] ❌ API configuration missing!');
     return {
       error: "AI service is not configured. Please set BUILT_IN_FORGE_API_KEY and BUILT_IN_FORGE_API_URL environment variables.",
     };
   }
+  
+  console.log('[LLM] ✅ API configuration valid');
   return null;
 };
 
@@ -290,6 +309,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     throw new Error(apiKeyError.error);
   }
 
+  // Use process.env as fallback if ENV object doesn't have values
+  const forgeApiUrl = ENV.forgeApiUrl || process.env.BUILT_IN_FORGE_API_URL || '';
+  const forgeApiKey = ENV.forgeApiKey || process.env.BUILT_IN_FORGE_API_KEY || '';
+
   const {
     messages,
     tools,
@@ -302,10 +325,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   // Detect which AI service is being used and set appropriate model
-  const isDeepSeek = ENV.forgeApiUrl?.includes('api.deepseek.com') || (!ENV.forgeApiUrl && ENV.forgeApiKey?.startsWith('sk-') && !ENV.forgeApiUrl);
-  const isPerplexity = ENV.forgeApiUrl?.includes('api.perplexity.ai') || ENV.forgeApiKey?.startsWith('pplx-');
-  const isOpenAI = ENV.forgeApiUrl?.includes('api.openai.com');
-  const isXAI = ENV.forgeApiUrl?.includes('api.x.ai') || ENV.forgeApiKey?.startsWith('xai-');
+  const isDeepSeek = forgeApiUrl?.includes('api.deepseek.com') || (!forgeApiUrl && forgeApiKey?.startsWith('sk-') && !forgeApiUrl);
+  const isPerplexity = forgeApiUrl?.includes('api.perplexity.ai') || forgeApiKey?.startsWith('pplx-');
+  const isOpenAI = forgeApiUrl?.includes('api.openai.com');
+  const isXAI = forgeApiUrl?.includes('api.x.ai') || forgeApiKey?.startsWith('xai-');
   
   let model: string;
   if (isDeepSeek) {
@@ -368,14 +391,69 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const apiUrl = resolveApiUrl();
+  console.log('[LLM] 📤 Making API request to:', apiUrl);
+  console.log('[LLM] 📊 Request details:');
+  console.log('[LLM]   - Model:', payload.model);
+  console.log('[LLM]   - Messages count:', payload.messages.length);
+  console.log('[LLM]   - Payload size:', JSON.stringify(payload).length, 'bytes');
+  console.log('[LLM]   - API Key prefix:', forgeApiKey.substring(0, 10) + '...');
+  
+  let response;
+  try {
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${forgeApiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+  } catch (fetchError) {
+    console.error('[LLM] ❌ Fetch error details:');
+    console.error('[LLM]   - Error type:', fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError);
+    console.error('[LLM]   - Error message:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+    
+    if (fetchError instanceof Error) {
+      if ('code' in fetchError) {
+        console.error('[LLM]   - Error code:', (fetchError as any).code);
+      }
+      if (fetchError.cause) {
+        console.error('[LLM]   - Error cause:', fetchError.cause);
+      }
+      if (fetchError.stack) {
+        console.error('[LLM]   - Stack trace:', fetchError.stack.substring(0, 500));
+      }
+    }
+    
+    // Provide helpful error message
+    const errorMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+    let helpfulMessage = `Network error calling LLM API: ${errorMsg}`;
+    
+    if (errorMsg.includes('fetch failed') || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND')) {
+      helpfulMessage += `\n\nPossible causes:
+1. Network connectivity issue - check your internet connection
+2. xAI API might require VPN in your region
+3. Firewall blocking the connection
+4. DNS resolution failed for ${apiUrl}
+5. API endpoint might be temporarily unavailable
+
+Try:
+- Check your internet connection
+- Try using a VPN if xAI requires it
+- Verify the API URL is correct: ${apiUrl}
+- Check if the API key is valid`;
+    }
+    
+    throw new Error(helpfulMessage);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

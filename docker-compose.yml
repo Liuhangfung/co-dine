@@ -22,6 +22,15 @@ services:
       - BUILT_IN_FORGE_API_URL=${BUILT_IN_FORGE_API_URL:-https://api.x.ai/v1}
       - BUILT_IN_FORGE_API_KEY=${BUILT_IN_FORGE_API_KEY}
       
+      # Transcript APIs
+      - SUPADATA_API_KEY=${SUPADATA_API_KEY}
+      - YOUTUBE_TRANSCRIPT_API_TOKEN=${YOUTUBE_TRANSCRIPT_API_TOKEN}
+      
+      # Image Generation APIs (optional)
+      - STABILITY_AI_API_KEY=${STABILITY_AI_API_KEY}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
       # Node environment
       - NODE_ENV=production
       - PORT=3000

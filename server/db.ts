@@ -28,10 +28,28 @@ let _client: postgres.Sql | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
+    // Parse and log connection details (masked)
+    const dbUrl = process.env.DATABASE_URL;
+    const urlMatch = dbUrl.match(/postgresql?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+    
+    if (urlMatch) {
+      const [, user, , host, port, database] = urlMatch;
+      console.log("[Database] 🔌 Attempting to connect to Supabase...");
+      console.log(`[Database]   Host: ${host}`);
+      console.log(`[Database]   Port: ${port}`);
+      console.log(`[Database]   User: ${user}`);
+      console.log(`[Database]   Database: ${database}`);
+      console.log(`[Database]   Connection type: ${port === '6543' ? 'Pooler' : port === '5432' ? 'Direct' : 'Unknown'}`);
+    } else {
+      console.log("[Database] 🔌 Attempting to connect...");
+      console.log("[Database]   URL format: (could not parse)");
+    }
+    
     try {
+      console.log("[Database] ⏳ Creating postgres client...");
       // Create postgres client with connection options
       // Optimized for Supabase PAID plan (higher connection limits)
-      _client = postgres(process.env.DATABASE_URL, {
+      _client = postgres(dbUrl, {
         max: 20, // Higher limit for paid plan (you have 200-400+ available)
         idle_timeout: 0, // Never timeout idle connections (keep alive forever)
         connect_timeout: 30, // Initial connection timeout
@@ -41,23 +59,107 @@ export async function getDb() {
           application_name: 'co-dine-app', // Identify your app in Supabase
         },
         // Keep connection alive with periodic pings (prevents firewall timeouts)
-        keep_alive: true,
         // Auto-reconnect on connection loss
         onnotice: () => {}, // Suppress notice logs
       });
-      // Test connection
-      await _client`SELECT 1`;
+      
+      console.log("[Database] ⏳ Testing connection with SELECT 1...");
+      const startTime = Date.now();
+      const result = await _client`SELECT 1 as test`;
+      const connectTime = Date.now() - startTime;
+      
+      console.log(`[Database] ✅ Connection test successful (${connectTime}ms)`);
+      console.log(`[Database] ✅ Test query result:`, result);
+      
       // Create drizzle instance
       _db = drizzle(_client);
       console.log("[Database] ✅ Connected to Supabase PostgreSQL");
+      console.log("[Database] ✅ Drizzle ORM initialized");
+      
+      // Additional health check: Try a simple query
+      try {
+        const healthCheck = await _db.select().from(users).limit(1);
+        console.log("[Database] ✅ Health check passed - can query users table");
+        console.log(`[Database]   Sample query returned ${healthCheck.length} row(s)`);
+      } catch (healthError) {
+        console.warn("[Database] ⚠️ Health check query failed (non-critical):", healthError instanceof Error ? healthError.message : healthError);
+      }
+      
     } catch (error) {
-      console.error("[Database] ❌ Failed to connect:", error instanceof Error ? error.message : error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("[Database] ❌ Failed to connect:", errorMsg);
+      console.error("[Database] Connection URL (masked):", dbUrl.replace(/:[^:@]+@/, ':****@'));
+      
+      // Provide helpful error messages with Supabase-specific guidance
+      if (errorMsg.includes('getaddrinfo ENOTFOUND')) {
+        console.error("[Database] 💡 Error type: DNS resolution failed");
+        console.error("[Database] 💡 Supabase Settings to Check:");
+        console.error("  1. ✅ Project Status: Dashboard → Ensure project is ACTIVE (not paused)");
+        console.error("  2. ✅ Connection String: Settings → Database → Copy exact string");
+        console.error("  3. ✅ Network Access: Settings → Database → Network restrictions (if enabled, add your IP)");
+        console.error("[Database] 💡 Solutions:");
+        console.error("  - Verify hostname matches Supabase Dashboard exactly");
+        console.error("  - Check if project is paused (unpause in Dashboard)");
+        console.error("  - Disable IP restrictions temporarily for testing");
+      } else if (errorMsg.includes('password authentication failed') || errorMsg.includes('authentication failed')) {
+        console.error("[Database] 💡 Error type: Authentication failed");
+        console.error("[Database] 💡 Supabase Settings to Check:");
+        console.error("  1. ✅ Database Password: Settings → Database → Database password");
+        console.error("     → Click 'Reset database password' if unsure");
+        console.error("     → Copy the NEW password (not your Supabase account password!)");
+        console.error("  2. ✅ Connection String Format: Settings → Database → Connection string");
+        console.error("     → Use 'Session pooler' or 'Transaction pooler'");
+        console.error("     → Copy the ENTIRE string including password");
+        console.error("  3. ✅ Username Format: Should be 'postgres.[PROJECT-REF]'");
+        console.error("     → Example: postgres.yvtuehrylsqqbiawlftu");
+        console.error("[Database] 💡 Common Issues:");
+        console.error("  ❌ Using Supabase account password instead of database password");
+        console.error("  ❌ Password contains special characters (may need URL encoding)");
+        console.error("  ❌ Connection string copied incorrectly");
+        console.error("[Database] 💡 Solutions:");
+        console.error("  1. Go to Supabase Dashboard → Settings → Database");
+        console.error("  2. Click 'Reset database password'");
+        console.error("  3. Copy the NEW connection string (includes new password)");
+        console.error("  4. Paste directly into .env file");
+        console.error("  5. Try Transaction pooler (port 6543) if Session pooler fails");
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+        console.error("[Database] 💡 Error type: Connection timeout");
+        console.error("[Database] 💡 Supabase Settings to Check:");
+        console.error("  1. ✅ Network Restrictions: Settings → Database → Network restrictions");
+        console.error("     → If enabled, add your IP address or disable temporarily");
+        console.error("  2. ✅ Connection Pooling: Settings → Database → Connection pooling");
+        console.error("     → Ensure pooling is enabled");
+        console.error("[Database] 💡 Solutions:");
+        console.error("  - Check firewall/antivirus settings");
+        console.error("  - Disable IP restrictions in Supabase temporarily");
+        console.error("  - Try Transaction pooler (port 6543)");
+      } else if (errorMsg.includes('Invalid URL')) {
+        console.error("[Database] 💡 Error type: Invalid connection string format");
+        console.error("[Database] 💡 Check:");
+        console.error("  1. ✅ Connection string doesn't have duplicate 'DATABASE_URL=' prefix");
+        console.error("  2. ✅ No extra spaces or quotes around the URL");
+        console.error("  3. ✅ Format: postgresql://user:password@host:port/database");
+      } else {
+        console.error("[Database] 💡 Unknown error - check error message above");
+        console.error("[Database] 💡 Supabase Settings Checklist:");
+        console.error("  ✅ Project is ACTIVE (not paused)");
+        console.error("  ✅ Database password is correct (reset if unsure)");
+        console.error("  ✅ Connection string copied exactly from Dashboard");
+        console.error("  ✅ Network restrictions allow your IP (or disabled)");
+        console.error("  ✅ Using correct port (5432 for Direct, 6543 for Pooler)");
+      }
+      
       _db = null;
       if (_client) {
         await _client.end().catch(() => {});
         _client = null;
       }
     }
+  } else if (!process.env.DATABASE_URL) {
+    console.error("[Database] ❌ DATABASE_URL environment variable is not set!");
+    console.error("[Database] 💡 Please set DATABASE_URL in your .env file");
+  } else if (_db) {
+    console.log("[Database] ✅ Using existing database connection");
   }
   return _db;
 }

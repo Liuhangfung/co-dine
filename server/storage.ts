@@ -6,8 +6,9 @@ import { ENV } from './_core/env';
 type StorageConfig = { baseUrl: string; apiKey: string };
 
 function getStorageConfig(): StorageConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
+  // Use process.env as fallback if ENV object doesn't have values
+  const baseUrl = ENV.forgeApiUrl || process.env.BUILT_IN_FORGE_API_URL || '';
+  const apiKey = ENV.forgeApiKey || process.env.BUILT_IN_FORGE_API_KEY || '';
 
   if (!baseUrl || !apiKey) {
     throw new Error(
@@ -72,24 +73,44 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
+  try {
+    const { baseUrl, apiKey } = getStorageConfig();
+    const key = normalizeKey(relKey);
+    const uploadUrl = buildUploadUrl(baseUrl, key);
+    
+    console.log('[Storage] 📤 Uploading to storage:', key);
+    console.log('[Storage] 📊 Upload details:');
+    console.log('[Storage]   - Base URL:', baseUrl);
+    console.log('[Storage]   - Upload URL:', uploadUrl.toString());
+    console.log('[Storage]   - Content type:', contentType);
+    console.log('[Storage]   - Data size:', typeof data === 'string' ? data.length : data.length, 'bytes');
+    
+    const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: buildAuthHeaders(apiKey),
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+    if (!response.ok) {
+      const message = await response.text().catch(() => response.statusText);
+      console.error('[Storage] ❌ Upload failed:', response.status, response.statusText);
+      console.error('[Storage]   Error details:', message);
+      throw new Error(
+        `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+      );
+    }
+    
+    const result = await response.json();
+    const url = result.url;
+    console.log('[Storage] ✅ Upload successful:', url);
+    return { key, url };
+  } catch (error) {
+    console.error('[Storage] ❌ Storage upload error:');
+    console.error('[Storage]   Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[Storage]   Error message:', error instanceof Error ? error.message : String(error));
+    throw error;
   }
-  const url = (await response.json()).url;
-  return { key, url };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {

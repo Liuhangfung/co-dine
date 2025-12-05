@@ -9,6 +9,9 @@ import { useState, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { toast } from "sonner";
 import { Loader2, Link as LinkIcon, PenTool } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function NewRecipe() {
@@ -51,10 +54,28 @@ export default function NewRecipe() {
     steps: [{ instruction: "", duration: 0, temperature: "", tips: "" }],
   });
 
+  const [showMultiRecipeDialog, setShowMultiRecipeDialog] = useState(false);
+  const [multiRecipeData, setMultiRecipeData] = useState<{
+    recipeCount: number;
+    allRecipes: { id: string; title: string }[];
+  } | null>(null);
+
   const createFromWeblink = trpc.recipes.createFromWeblink.useMutation({
     onSuccess: (data) => {
-      toast.success("食譜創建成功!");
-      setLocation(`/recipes/${data.recipeId}`);
+      if (data.recipeCount && data.recipeCount > 1) {
+        toast.success(`成功創建 ${data.recipeCount} 個食譜！`, {
+          description: "已從影片中提取多個食譜，點擊下方查看",
+          duration: 5000,
+        });
+        setMultiRecipeData({
+          recipeCount: data.recipeCount,
+          allRecipes: data.allRecipes || [],
+        });
+        setShowMultiRecipeDialog(true);
+      } else {
+        toast.success("食譜創建成功!");
+        setLocation(`/recipes/${data.recipeId}`);
+      }
     },
     onError: (error) => {
       const errorMsg = error.message;
@@ -396,6 +417,51 @@ export default function NewRecipe() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Multi-Recipe Dialog */}
+      <Dialog open={showMultiRecipeDialog} onOpenChange={setShowMultiRecipeDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>🎉 成功創建 {multiRecipeData?.recipeCount} 個食譜！</DialogTitle>
+            <DialogDescription>
+              已從影片中提取多個食譜，點擊下方查看
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-72 w-full rounded-md border p-4">
+            <div className="grid gap-4 py-4">
+              {multiRecipeData?.allRecipes.map((recipe, index) => (
+                <div key={recipe.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="w-6 h-6 flex items-center justify-center rounded-full">
+                      {index + 1}
+                    </Badge>
+                    <span className="font-medium">{recipe.title}</span>
+                  </div>
+                  <Button variant="link" onClick={() => {
+                    setLocation(`/recipes/${recipe.id}`);
+                    setShowMultiRecipeDialog(false);
+                  }}>
+                    查看 <LinkIcon className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMultiRecipeDialog(false)}>
+              返回儀表板
+            </Button>
+            {multiRecipeData?.allRecipes?.[0] && (
+              <Button onClick={() => {
+                setLocation(`/recipes/${multiRecipeData.allRecipes[0].id}`);
+                setShowMultiRecipeDialog(false);
+              }}>
+                查看第一個食譜
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -44,11 +44,25 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files (package-lock.json is optional but speeds up builds)
 COPY package.json package-lock.json* ./
 
-# Install dependencies using npm (more reliable in Docker than pnpm)
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Configure npm with timeout and use Chinese mirror (more reliable when main registry is down)
+RUN npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set registry https://registry.npmmirror.com
+
+# Install dependencies using npm
+# If package-lock.json exists, use npm ci (faster), otherwise npm install
+RUN if [ -f package-lock.json ]; then \
+      npm ci --legacy-peer-deps --progress=false || \
+      (npm config set registry https://registry.npmjs.org && npm ci --legacy-peer-deps --progress=false); \
+    else \
+      npm install --legacy-peer-deps --progress=false || \
+      (npm config set registry https://registry.npmjs.org && npm install --legacy-peer-deps --progress=false); \
+    fi
 
 # Install Playwright browsers
 RUN npx playwright install chromium
