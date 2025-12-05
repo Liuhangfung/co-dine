@@ -403,14 +403,16 @@ export const appRouter = router({
 - 烹飪時間、溫度、火候等技術細節
 - 口感描述和特色（例如：「脆皮」、「爆汁」、「完美口感」）
 - 烹飪提示和注意事項
+- 任何與烹飪、食材、食譜相關的描述
 
 **可以移除的內容**：
 - 影片開頭或結尾的問候語、感謝語（如「大家好」、「謝謝觀看」）
-- 純廣告、推廣內容
+- 純廣告、推廣內容（如「記得訂閱」、「成為會員」）
 - 與烹飪完全無關的閒聊
-- 影片製作相關的評論（如「記得訂閱」）
+- 影片製作相關的評論（如「記得訂閱」、「按讚」）
 - 重複的內容
 - 表情符號和特殊符號
+- 網址連結（但保留網址中的關鍵字如「職人吹水」）
 
 **翻譯要求**：
 - **必須將所有非繁體中文的內容翻譯成繁體中文**
@@ -419,10 +421,12 @@ export const appRouter = router({
 - 確保翻譯後的內容自然流暢，符合繁體中文的表達習慣
 - 如果原始內容已經是繁體中文，則保持不變
 
-**重要**：
-1. 保留所有烹飪技巧、比較說明和重要細節
-2. 確保所有內容都是繁體中文
-3. 翻譯要準確且自然
+**重要原則**：
+1. **如果內容已經很短（少於500字），請盡量保留所有內容，只移除明顯的廣告和問候語**
+2. 保留所有烹飪技巧、比較說明和重要細節
+3. 確保所有內容都是繁體中文
+4. 翻譯要準確且自然
+5. **寧可多保留內容，也不要過度過濾**
 
 只返回純文本，不包含任何額外說明或Markdown格式。所有輸出必須是繁體中文。`
               },
@@ -446,9 +450,19 @@ export const appRouter = router({
           filteredTranscript = preFilterResult.choices[0].message.content as string;
           console.log('[createFromWeblink] ✅ Pre-filter complete:');
           const originalLength = scrapedContent.videoTranscript?.length || 0;
+          const filteredLength = filteredTranscript.length;
+          const reductionPercent = originalLength > 0 ? ((1 - filteredLength / originalLength) * 100).toFixed(1) : '0';
+          const reductionPercentNum = parseFloat(reductionPercent);
           console.log(`  Original: ${originalLength} chars`);
-          console.log(`  Filtered: ${filteredTranscript.length} chars (${originalLength > 0 ? ((1 - filteredTranscript.length / originalLength) * 100).toFixed(1) : 0}% reduction)`);
+          console.log(`  Filtered: ${filteredLength} chars (${reductionPercent}% reduction)`);
           console.log(`  Preview: ${filteredTranscript.substring(0, 200)}...`);
+          
+          // If filtered content is too short (< 100 chars) or reduction is too aggressive (> 90%), use original
+          if (filteredLength < 100 || (originalLength > 0 && reductionPercentNum > 90)) {
+            console.log('[createFromWeblink] ⚠️  Pre-filter too aggressive (filtered content too short or reduction > 90%)');
+            console.log('[createFromWeblink] 🔄 Using original transcript instead to preserve content');
+            filteredTranscript = scrapedContent.videoTranscript || '';
+          }
           
           } catch (preFilterError) {
             console.error('[createFromWeblink] ❌ Pre-filter LLM call failed:');
@@ -467,7 +481,15 @@ export const appRouter = router({
         console.log('[createFromWeblink] ========================================');
         console.log('[createFromWeblink] 📍 Step 4b: STAGE 1 - RECIPE DETECTION');
         console.log('[createFromWeblink] 🔍 Stage 1: Detecting and extracting ALL recipes from transcript...');
-        console.log('[createFromWeblink] 📊 Input transcript length:', hasVideoTranscript ? filteredTranscript.length : scrapedContent.content.substring(0, 10000).length, 'characters');
+        
+        // Use original transcript if filtered is too short
+        let transcriptForStage1 = filteredTranscript;
+        if (hasVideoTranscript && filteredTranscript.length < 100 && scrapedContent.videoTranscript && scrapedContent.videoTranscript.length > filteredTranscript.length) {
+          console.log('[createFromWeblink] ⚠️  Filtered transcript too short for Stage 1, using original transcript');
+          transcriptForStage1 = scrapedContent.videoTranscript;
+        }
+        
+        console.log('[createFromWeblink] 📊 Input transcript length:', hasVideoTranscript ? transcriptForStage1.length : scrapedContent.content.substring(0, 10000).length, 'characters');
         console.log('[createFromWeblink] 📝 Video title:', scrapedContent.title);
         console.log('[createFromWeblink] ⏳ Calling LLM for Stage 1 (recipe detection)...');
         const stage1StartTime = Date.now();
@@ -477,7 +499,7 @@ export const appRouter = router({
         
         // Build context with video title
         const videoTitleContext = scrapedContent.title ? `\n\n**影片標題**: ${scrapedContent.title}\n\n` : '';
-        const stage1Prompt = `請從以下影片字幕中識別並提取**所有食譜**。${videoTitleContext}**影片字幕內容**:\n\n${hasVideoTranscript ? filteredTranscript : scrapedContent.content.substring(0, 10000)}`;
+        const stage1Prompt = `請從以下影片字幕中識別並提取**所有食譜**。${videoTitleContext}**影片字幕內容**:\n\n${hasVideoTranscript ? transcriptForStage1 : scrapedContent.content.substring(0, 10000)}`;
         
         try {
           extractionResult = await invokeLLM({
@@ -496,6 +518,8 @@ export const appRouter = router({
 1. 如果影片標題包含特殊描述（如「米芝連」、「脆皮爆汁」等），請在食譜名稱中保留這些特色
 2. 如果影片只有一個食譜，返回包含一個元素的數組。如果有多個食譜，返回包含多個元素的數組。
 3. 保留所有烹飪技巧和重要細節
+4. **即使內容較短，也要盡力從中提取食譜信息**。如果內容不足，可以根據影片標題和現有信息推斷基本的食譜結構
+5. 如果影片標題明確提到食譜名稱（如「揚州炒飯」），即使內容較短，也要創建一個基本的食譜結構
 
 只返回JSON數組格式，不要markdown代碼塊。`
             },
